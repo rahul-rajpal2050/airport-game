@@ -93,6 +93,11 @@ export function startLoop(el: HTMLCanvasElement): void {
   detachInput = attachInput(canvas, getState)
   lastTime = performance.now()
   rafId = requestAnimationFrame(loop)
+
+  if (import.meta.env.DEV) {
+    // dev console handle for feel-tuning: __game.getState().timeScale = 4, etc.
+    ;(window as unknown as Record<string, unknown>).__game = { getState, startShift }
+  }
 }
 
 export function stopLoop(): void {

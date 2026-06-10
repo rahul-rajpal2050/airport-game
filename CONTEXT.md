@@ -74,6 +74,9 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
 
 ## Recent Changes
+[2026-06-10] Density retune after feel feedback: spawnCurve 5->12/min (was 2->8),
+occupancy 12s->8s, tighter holding rings, faster orbit. ~44-54 planes/shift, first
+contact <14s. Added dev console handle window.__game (DEV only) for feel-tuning.
 [2026-06-10] Phase 1 complete: core loop playable — spawn, tap-tap assign, hold/orbit,
 land, score screen with stats and replay. 22 tests passing (bun test).
 [2026-06-10] Phase 0: Vite + TS scaffold, seeded RNG, config.ts, canvas loop shell

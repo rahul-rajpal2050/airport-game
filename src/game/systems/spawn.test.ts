@@ -37,7 +37,12 @@ describe('generateSchedule', () => {
 })
 
 describe('rateAt', () => {
-  const curve = CONFIG.shift.spawnCurve
+  // local fixture so retuning CONFIG.shift.spawnCurve never breaks this test
+  const curve: [number, number][] = [
+    [0, 2],
+    [120, 4],
+    [180, 6],
+  ]
 
   it('returns curve endpoints outside the range', () => {
     expect(rateAt(-5, curve)).toBe(curve[0][1])
@@ -45,7 +50,6 @@ describe('rateAt', () => {
   })
 
   it('interpolates linearly between points', () => {
-    // curve has [120, 4] and [180, 6]; midpoint 150 should be 5
     expect(rateAt(150, curve)).toBe(5)
   })
 })

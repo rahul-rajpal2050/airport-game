@@ -10,18 +10,18 @@ export const CONFIG = {
     durationSeconds: 300,
     // [timeSeconds, planesPerMinute] — piecewise linear spawn curve
     spawnCurve: [
-      [0, 2],
-      [60, 3],
-      [120, 4],
-      [180, 6],
-      [240, 8],
-      [300, 8],
+      [0, 5],
+      [60, 7],
+      [120, 9],
+      [180, 11],
+      [240, 12],
+      [300, 12],
     ] as [number, number][],
   },
 
   runway: {
     count: 2,
-    occupancySeconds: 12,      // how long a plane blocks the runway after touchdown
+    occupancySeconds: 8,       // how long a plane blocks the runway after touchdown
     lengthPixels: 130,
     widthPixels: 22,
     tapPaddingPixels: 14,      // extra hit-test margin for fat fingers
@@ -41,9 +41,9 @@ export const CONFIG = {
     // Holding circle center and radius, planes orbit here awaiting a runway
     holdingCenterX: 195,
     holdingCenterY: 220,
-    holdingRadiusBase: 60,
-    holdingRadiusStep: 30,     // each additional plane expands radius by this
-    orbitSpeedDegreesPerSecond: 18,
+    holdingRadiusBase: 55,
+    holdingRadiusStep: 22,     // each additional plane expands radius by this
+    orbitSpeedDegreesPerSecond: 26,
     spawnEdgeMarginPixels: 30, // spawn offset from screen edges
     fuelJitter: 10,            // initial fuel varies +/- this amount
   },
