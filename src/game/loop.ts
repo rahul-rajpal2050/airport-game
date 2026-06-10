@@ -32,6 +32,9 @@ function makeIdleState(): GameState {
     events: [],
     stats: newStats(),
     selectedPlaneId: null,
+    streak: 0,
+    slowMoMs: 0,
+    nearMissPairs: new Map(),
   }
 }
 
@@ -62,7 +65,12 @@ function endShift(): void {
 
 function update(dt: number): void {
   if (state.phase !== 'active') return
-  if (simulate(state, dt * state.timeScale)) endShift()
+  let scale = state.timeScale
+  if (state.slowMoMs > 0) {
+    state.slowMoMs = Math.max(0, state.slowMoMs - dt * 1000) // wall-clock countdown
+    scale *= CONFIG.nearMiss.slowMoFactor
+  }
+  if (simulate(state, dt * scale)) endShift()
 }
 
 function resize(): void {

@@ -30,6 +30,7 @@ const ALLOWED: Partial<Record<PlaneState, PlaneState[]>> = {
 export type FrameEvent =
   | { type: 'spawned' | 'landed' | 'diverted' | 'raged' | 'boarding_ready'; plane: Plane }
   | { type: 'departed_ok'; plane: Plane; delaySeconds: number }
+  | { type: 'near_miss'; a: Plane; b: Plane }
 
 export interface UpdateContext {
   events: FrameEvent[]

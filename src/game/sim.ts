@@ -1,4 +1,5 @@
 import { CONFIG } from '../config'
+import { detectNearMisses } from './systems/collision'
 import { applyScoring } from './systems/scoring'
 import { updateSpawns } from './systems/spawn'
 import type { GameState } from './state'
@@ -22,13 +23,16 @@ export function simulate(state: GameState, dt: number): boolean {
   const updateCtx = { events: state.events, shiftTime: state.shiftTime, occupiedRings }
   for (const plane of state.planes) plane.update(dt, updateCtx)
 
-  // 3. runway sequencing
+  // 3. near-miss detection
+  detectNearMisses(state)
+
+  // 4. runway sequencing
   for (const runway of state.runways) runway.sequence()
 
-  // 4. scoring consumes events
+  // 5. scoring consumes events
   applyScoring(state)
 
-  // 5. sweep finished planes
+  // 6. sweep finished planes
   state.planes = state.planes.filter((p) => p.state !== 'departed' && p.state !== 'diverted')
 
   return state.shiftTime >= CONFIG.shift.durationSeconds

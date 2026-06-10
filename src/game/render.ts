@@ -23,6 +23,8 @@ const COLORS = {
   holdRing: 'rgba(148, 163, 184, 0.12)',
   hud: '#94a3b8',
   hudBright: '#e2e8f0',
+  streak: '#4ade80',
+  slowMoTint: 'rgba(96, 165, 250, 0.07)',
   fuelBar: '#facc15',
   patienceBar: '#fb923c',
   barBg: 'rgba(148, 163, 184, 0.25)',
@@ -41,6 +43,11 @@ export function draw(ctx: CanvasRenderingContext2D, state: GameState): void {
   drawAssignmentLines(ctx, state)
   for (const plane of state.planes) drawPlane(ctx, plane, plane.id === state.selectedPlaneId, state.shiftTime)
   drawHud(ctx, state)
+
+  if (state.slowMoMs > 0) {
+    ctx.fillStyle = COLORS.slowMoTint
+    ctx.fillRect(0, 0, width, height)
+  }
 }
 
 function drawTerminal(ctx: CanvasRenderingContext2D, gates: Gate[]): void {
@@ -244,4 +251,10 @@ function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
   ctx.fillStyle = COLORS.hud
   ctx.textAlign = 'center'
   ctx.fillText(`${airborne} inbound`, width / 2, pad + 16)
+
+  if (state.streak > 0) {
+    ctx.fillStyle = COLORS.streak
+    ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
+    ctx.fillText(`near-miss x${state.streak}`, width / 2, pad + 32)
+  }
 }

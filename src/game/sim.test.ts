@@ -23,6 +23,9 @@ function makeShiftState(seed: number | string): GameState {
     events: [],
     stats: newStats(),
     selectedPlaneId: null,
+    streak: 0,
+    slowMoMs: 0,
+    nearMissPairs: new Map(),
   }
 }
 

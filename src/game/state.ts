@@ -12,6 +12,8 @@ export interface ShiftStats {
   diverted: number
   raged: number
   leftInAir: number
+  nearMisses: number
+  bestStreak: number
   longestHoldSeconds: number
   longestHoldCallsign: string
   worstDelaySeconds: number
@@ -32,6 +34,12 @@ export interface GameState {
   events: FrameEvent[]
   stats: ShiftStats
   selectedPlaneId: number | null
+  /** consecutive near-misses without a failure; resets on diverted/raged */
+  streak: number
+  /** remaining slow-motion time (wall-clock ms); loop applies slowMoFactor while > 0 */
+  slowMoMs: number
+  /** last near-miss shiftTime per plane pair, for the cooldown */
+  nearMissPairs: Map<string, number>
 }
 
 export function newStats(): ShiftStats {
@@ -42,6 +50,8 @@ export function newStats(): ShiftStats {
     diverted: 0,
     raged: 0,
     leftInAir: 0,
+    nearMisses: 0,
+    bestStreak: 0,
     longestHoldSeconds: 0,
     longestHoldCallsign: '',
     worstDelaySeconds: 0,

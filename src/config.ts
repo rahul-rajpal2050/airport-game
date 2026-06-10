@@ -72,7 +72,8 @@ export const CONFIG = {
   },
 
   nearMiss: {
-    thresholdPixels: 45,
+    thresholdPixels: 30,
+    cooldownSeconds: 5,        // min gap between near-misses for the same pair
     slowMoFactor: 0.2,         // time scale during slow-mo
     slowMoDurationMs: 1200,
     screenShakeIntensity: 6,

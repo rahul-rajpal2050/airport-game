@@ -18,6 +18,9 @@ function makeState(): GameState {
     events: [],
     stats: newStats(),
     selectedPlaneId: null,
+    streak: 0,
+    slowMoMs: 0,
+    nearMissPairs: new Map(),
   }
 }
 
@@ -73,6 +76,31 @@ describe('applyScoring', () => {
     expect(state.stats.score).toBe(-S.diversionPenalty - S.ragePenalty)
     expect(state.stats.diverted).toBe(1)
     expect(state.stats.raged).toBe(1)
+  })
+
+  it('near-miss streak compounds the bonus and tracks the best', () => {
+    const state = makeState()
+    const a = makePlane()
+    const b = new Plane(2, 'BB222', 0, 0, 80, 0)
+    state.events.push({ type: 'near_miss', a, b })
+    state.events.push({ type: 'near_miss', a, b })
+    applyScoring(state)
+    const expected =
+      Math.round(S.nearMissBonus) + Math.round(S.nearMissBonus * (1 + S.streakMultiplierStep))
+    expect(state.stats.score).toBe(expected)
+    expect(state.streak).toBe(2)
+    expect(state.stats.bestStreak).toBe(2)
+    expect(state.stats.nearMisses).toBe(2)
+  })
+
+  it('rage resets the streak but keeps the best', () => {
+    const state = makeState()
+    state.streak = 4
+    state.stats.bestStreak = 4
+    state.events.push({ type: 'raged', plane: makePlane() })
+    applyScoring(state)
+    expect(state.streak).toBe(0)
+    expect(state.stats.bestStreak).toBe(4)
   })
 
   it('tracks the longest hold across landed and diverted planes', () => {
