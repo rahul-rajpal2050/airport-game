@@ -80,7 +80,7 @@ export function updateSpawns(state: GameState): void {
     state.schedule[state.scheduleIndex].time <= state.shiftTime
   ) {
     const e = state.schedule[state.scheduleIndex++]
-    const plane = new Plane(nextPlaneId++, e.callsign, e.x, e.y, e.fuel)
+    const plane = new Plane(nextPlaneId++, e.callsign, e.x, e.y, e.fuel, e.time)
     state.planes.push(plane)
     state.events.push({ type: 'spawned', plane })
   }

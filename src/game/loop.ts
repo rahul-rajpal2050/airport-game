@@ -5,6 +5,7 @@ import { draw } from './render'
 import { simulate } from './sim'
 import { gameStore, newStats, type GameState } from './state'
 import { generateSchedule, resetPlaneIds } from './systems/spawn'
+import { Gate } from './entities/gate'
 import { Runway } from './entities/runway'
 
 const { width: LOGICAL_W, height: LOGICAL_H } = CONFIG.canvas
@@ -25,6 +26,7 @@ function makeIdleState(): GameState {
     timeScale: 1,
     planes: [],
     runways: [],
+    gates: [],
     schedule: [],
     scheduleIndex: 0,
     events: [],
@@ -45,6 +47,7 @@ export function startShift(seed: number | string): void {
   state.runways = CONFIG.runway.positions
     .slice(0, CONFIG.runway.count)
     .map((p, i) => new Runway(i, p.x, p.y, p.angle))
+  state.gates = Array.from({ length: CONFIG.gate.count }, (_, i) => new Gate(i))
   state.schedule = generateSchedule(rng)
   state.phase = 'active'
   gameStore.notify()

@@ -1,19 +1,17 @@
 import { CONFIG } from '../../config'
+import type { Gate } from './gate'
 import type { Runway } from './runway'
 
-// Full lifecycle defined now; Phase 1 implements approaching → holding →
-// landing → rolling → departed, plus the diverted failure branch.
-// Phase 2 adds the gate path (taxiing → at_gate → boarding → taxiing_out → departing).
 export type PlaneState =
   | 'approaching'
   | 'holding'
   | 'landing'
-  | 'rolling'
-  | 'taxiing'
-  | 'at_gate'
-  | 'boarding'
-  | 'taxiing_out'
-  | 'departing'
+  | 'rolling'      // on runway after touchdown; BLOCKS it until a gate is assigned
+  | 'taxiing'      // runway -> gate
+  | 'at_gate'      // turnaround in progress (patience paused)
+  | 'boarding'     // turnaround done, waiting for departure runway (patience drains)
+  | 'taxiing_out'  // gate -> hold-short point (gate freed on exit)
+  | 'departing'    // takeoff roll + climb-out
   | 'departed'
   | 'diverted'
 
@@ -21,13 +19,17 @@ const ALLOWED: Partial<Record<PlaneState, PlaneState[]>> = {
   approaching: ['holding', 'landing', 'diverted'],
   holding: ['landing', 'diverted'],
   landing: ['rolling'],
-  rolling: ['departed'],
+  rolling: ['taxiing'],
+  taxiing: ['at_gate'],
+  at_gate: ['boarding'],
+  boarding: ['taxiing_out'],
+  taxiing_out: ['departing'],
+  departing: ['departed'],
 }
 
-export interface FrameEvent {
-  type: 'spawned' | 'landed' | 'diverted'
-  plane: Plane
-}
+export type FrameEvent =
+  | { type: 'spawned' | 'landed' | 'diverted' | 'raged' | 'boarding_ready'; plane: Plane }
+  | { type: 'departed_ok'; plane: Plane; delaySeconds: number }
 
 export interface UpdateContext {
   events: FrameEvent[]
@@ -37,30 +39,40 @@ export interface UpdateContext {
 }
 
 const DEG = Math.PI / 180
+const OFFSCREEN_MARGIN = 40
 
 export class Plane {
   readonly id: number
   readonly callsign: string
+  readonly deadline: number // shiftTime by which passengers expect wheels-up
   x: number
   y: number
   heading = 0 // radians
   state: PlaneState = 'approaching'
   fuel: number
   patience: number = CONFIG.plane.initialPatience
+  raged = false
   holdSeconds = 0
   ringIndex = -1
   orbitAngle = 0
   assignedRunway: Runway | null = null
+  assignedGate: Gate | null = null
+  rolloutDone = false
+  atHoldShort = false
+  wheelsUp = false
   private rollElapsed = 0
   private rollFrom = { x: 0, y: 0 }
   private rollTo = { x: 0, y: 0 }
+  private taxiTarget = { x: 0, y: 0 }
+  private gateTimer = 0
 
-  constructor(id: number, callsign: string, x: number, y: number, fuel: number) {
+  constructor(id: number, callsign: string, x: number, y: number, fuel: number, spawnTime: number) {
     this.id = id
     this.callsign = callsign
     this.x = x
     this.y = y
     this.fuel = fuel
+    this.deadline = spawnTime + CONFIG.plane.scheduleSlackSeconds
     const { holdingCenterX, holdingCenterY } = CONFIG.approach
     this.heading = Math.atan2(holdingCenterY - y, holdingCenterX - x)
   }
@@ -72,16 +84,62 @@ export class Plane {
     }
     if (this.state === 'holding') this.ringIndex = -1
     this.state = to
+
     if (to === 'landing' && this.assignedRunway) {
       const { threshold, end } = this.assignedRunway.geometry()
       this.rollFrom = threshold
       this.rollTo = end
       this.rollElapsed = 0
+    } else if (to === 'taxiing' && this.assignedGate) {
+      this.taxiTarget = { x: this.assignedGate.x, y: this.assignedGate.y }
+      this.assignedRunway = null // arrival complete; departure needs a fresh assignment
+    } else if (to === 'at_gate') {
+      this.gateTimer = 0
+      this.heading = -Math.PI / 2 // nose to the terminal
+    } else if (to === 'taxiing_out' && this.assignedRunway) {
+      this.taxiTarget = this.assignedRunway.holdShortPoint()
+      this.atHoldShort = false
+      this.assignedGate?.release() // gate frees the moment the plane pushes back
+    } else if (to === 'departing' && this.assignedRunway) {
+      const { threshold, end } = this.assignedRunway.geometry()
+      this.rollFrom = threshold
+      this.rollTo = end
+      this.rollElapsed = 0
+      this.x = threshold.x
+      this.y = threshold.y
+      this.heading = Math.atan2(end.y - threshold.y, end.x - threshold.x)
     }
   }
 
+  /** Airborne and awaiting a landing slot — valid arrival-queue target */
   get isAirborneControllable(): boolean {
     return this.state === 'approaching' || this.state === 'holding'
+  }
+
+  /** Player can tap-select this plane */
+  get isSelectable(): boolean {
+    return (
+      this.isAirborneControllable ||
+      (this.state === 'rolling' && this.rolloutDone) ||
+      this.state === 'boarding'
+    )
+  }
+
+  /** Runway occupant no longer blocks the strip */
+  get clearOfRunway(): boolean {
+    if (this.state === 'landing' || this.state === 'rolling') return false
+    if (this.state === 'departing') return this.wheelsUp
+    return true
+  }
+
+  /** Patience is actively draining — passengers are waiting on the player */
+  private get isWaiting(): boolean {
+    return (
+      this.state === 'holding' ||
+      this.state === 'boarding' ||
+      (this.state === 'rolling' && this.rolloutDone) ||
+      (this.state === 'taxiing_out' && this.atHoldShort)
+    )
   }
 
   update(dt: number, ctx: UpdateContext): void {
@@ -98,6 +156,33 @@ export class Plane {
       case 'rolling':
         this.updateRolling(dt, ctx)
         break
+      case 'taxiing':
+        this.updateTaxi(dt, () => this.transition('at_gate'))
+        break
+      case 'at_gate':
+        this.gateTimer += dt
+        if (this.gateTimer >= CONFIG.gate.turnaroundSeconds) {
+          this.transition('boarding')
+          ctx.events.push({ type: 'boarding_ready', plane: this })
+        }
+        break
+      case 'taxiing_out':
+        if (!this.atHoldShort) this.updateTaxi(dt, () => (this.atHoldShort = true))
+        break
+      case 'departing':
+        this.updateDeparting(dt, ctx)
+        break
+    }
+    this.drainPatience(dt, ctx)
+  }
+
+  private drainPatience(dt: number, ctx: UpdateContext): void {
+    if (this.state === 'holding') this.holdSeconds += dt
+    if (!this.isWaiting || this.raged) return
+    this.patience = Math.max(0, this.patience - CONFIG.plane.patienceDrainPerSecond * dt)
+    if (this.patience === 0) {
+      this.raged = true
+      ctx.events.push({ type: 'raged', plane: this })
     }
   }
 
@@ -121,7 +206,6 @@ export class Plane {
     this.heading = Math.atan2(dy, dx)
     const step = CONFIG.plane.speedPixelsPerSecond * dt
 
-    // enter the innermost free holding ring when we reach its radius
     let ring = 0
     while (ctx.occupiedRings.has(ring)) ring++
     const ringRadius = CONFIG.approach.holdingRadiusBase + ring * CONFIG.approach.holdingRadiusStep
@@ -139,8 +223,6 @@ export class Plane {
 
   private updateHolding(dt: number, ctx: UpdateContext): void {
     if (this.drainFuel(dt, ctx)) return
-    this.patience = Math.max(0, this.patience - CONFIG.plane.patienceDrainPerSecond * dt)
-    this.holdSeconds += dt
     const { holdingCenterX: cx, holdingCenterY: cy, holdingRadiusBase, holdingRadiusStep, orbitSpeedDegreesPerSecond } = CONFIG.approach
     const radius = holdingRadiusBase + this.ringIndex * holdingRadiusStep
     this.orbitAngle += orbitSpeedDegreesPerSecond * DEG * dt
@@ -167,14 +249,67 @@ export class Plane {
   }
 
   private updateRolling(dt: number, ctx: UpdateContext): void {
-    this.rollElapsed += dt
-    const t = Math.min(this.rollElapsed / CONFIG.runway.occupancySeconds, 1)
-    const ease = 1 - (1 - t) * (1 - t) // ease-out: fast touchdown, slow rollout
-    this.x = this.rollFrom.x + (this.rollTo.x - this.rollFrom.x) * ease
-    this.y = this.rollFrom.y + (this.rollTo.y - this.rollFrom.y) * ease
-    if (t >= 1) {
+    if (!this.rolloutDone) {
+      this.rollElapsed += dt
+      const t = Math.min(this.rollElapsed / CONFIG.runway.occupancySeconds, 1)
+      const ease = 1 - (1 - t) * (1 - t)
+      this.x = this.rollFrom.x + (this.rollTo.x - this.rollFrom.x) * ease
+      this.y = this.rollFrom.y + (this.rollTo.y - this.rollFrom.y) * ease
+      if (t >= 1) {
+        this.rolloutDone = true
+        ctx.events.push({ type: 'landed', plane: this })
+      }
+      return
+    }
+    // rollout finished: leave for the gate if one is assigned, else BLOCK the runway
+    if (this.assignedGate) this.transition('taxiing')
+  }
+
+  private updateTaxi(dt: number, onArrive: () => void): void {
+    const dx = this.taxiTarget.x - this.x
+    const dy = this.taxiTarget.y - this.y
+    const dist = Math.hypot(dx, dy)
+    const step = CONFIG.plane.taxiSpeedPixelsPerSecond * dt
+    if (dist <= step) {
+      this.x = this.taxiTarget.x
+      this.y = this.taxiTarget.y
+      onArrive()
+      return
+    }
+    this.heading = Math.atan2(dy, dx)
+    this.x += (dx / dist) * step
+    this.y += (dy / dist) * step
+  }
+
+  private updateDeparting(dt: number, ctx: UpdateContext): void {
+    if (!this.wheelsUp) {
+      this.rollElapsed += dt
+      const t = Math.min(this.rollElapsed / CONFIG.runway.takeoffSeconds, 1)
+      const ease = t * t // ease-in: slow start, fast liftoff
+      this.x = this.rollFrom.x + (this.rollTo.x - this.rollFrom.x) * ease
+      this.y = this.rollFrom.y + (this.rollTo.y - this.rollFrom.y) * ease
+      if (t >= 1) {
+        this.wheelsUp = true
+        const delay = Math.max(0, ctx.shiftTime - this.deadline)
+        ctx.events.push({ type: 'departed_ok', plane: this, delaySeconds: delay })
+      }
+      return
+    }
+    // climb out: curve toward the top edge, despawn off-screen
+    const targetHeading = -Math.PI / 2
+    let diff = targetHeading - this.heading
+    while (diff > Math.PI) diff -= 2 * Math.PI
+    while (diff < -Math.PI) diff += 2 * Math.PI
+    this.heading += diff * Math.min(1, dt * 1.5)
+    const speed = CONFIG.plane.climbOutSpeedPixelsPerSecond
+    this.x += Math.cos(this.heading) * speed * dt
+    this.y += Math.sin(this.heading) * speed * dt
+    const { width, height } = CONFIG.canvas
+    if (
+      this.x < -OFFSCREEN_MARGIN || this.x > width + OFFSCREEN_MARGIN ||
+      this.y < -OFFSCREEN_MARGIN || this.y > height + OFFSCREEN_MARGIN
+    ) {
       this.transition('departed')
-      ctx.events.push({ type: 'landed', plane: this })
     }
   }
 }

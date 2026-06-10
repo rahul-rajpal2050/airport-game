@@ -10,11 +10,11 @@ export function attachInput(canvas: HTMLCanvasElement, getState: () => GameState
     const lx = ((e.clientX - rect.left) / rect.width) * CONFIG.canvas.width
     const ly = ((e.clientY - rect.top) / rect.height) * CONFIG.canvas.height
 
-    // 1. plane tap — nearest controllable plane within hit radius
+    // 1. plane tap — nearest selectable plane within hit radius
     let nearest = null
     let nearestDist = CONFIG.plane.hitRadiusPixels
     for (const plane of state.planes) {
-      if (!plane.isAirborneControllable) continue
+      if (!plane.isSelectable) continue
       const d = Math.hypot(plane.x - lx, plane.y - ly)
       if (d < nearestDist) {
         nearest = plane
@@ -26,21 +26,34 @@ export function attachInput(canvas: HTMLCanvasElement, getState: () => GameState
       return
     }
 
-    // 2. runway tap with a plane selected — assign
-    if (state.selectedPlaneId !== null) {
-      const selected = state.planes.find((p) => p.id === state.selectedPlaneId)
-      if (selected?.isAirborneControllable) {
-        for (const runway of state.runways) {
-          if (runway.containsPoint(lx, ly)) {
-            runway.enqueue(selected)
-            state.selectedPlaneId = null
-            return
-          }
+    const selected = state.planes.find((p) => p.id === state.selectedPlaneId)
+
+    // 2. runway tap — arrival queue (airborne) or departure queue (boarding)
+    if (selected?.isAirborneControllable || selected?.state === 'boarding') {
+      for (const runway of state.runways) {
+        if (runway.containsPoint(lx, ly)) {
+          runway.enqueue(selected)
+          state.selectedPlaneId = null
+          return
         }
       }
     }
 
-    // 3. empty space — deselect
+    // 3. gate tap — reserve for any plane that hasn't reached a gate yet
+    if (
+      selected &&
+      (selected.isAirborneControllable || (selected.state === 'rolling' && selected.rolloutDone))
+    ) {
+      for (const gate of state.gates) {
+        if (gate.containsPoint(lx, ly) && gate.free) {
+          gate.reserve(selected)
+          state.selectedPlaneId = null
+          return
+        }
+      }
+    }
+
+    // 4. empty space — deselect
     state.selectedPlaneId = null
   }
 

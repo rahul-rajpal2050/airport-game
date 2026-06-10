@@ -1,4 +1,5 @@
 import type { FrameEvent, Plane } from './entities/plane'
+import type { Gate } from './entities/gate'
 import type { Runway } from './entities/runway'
 import type { SpawnEntry } from './systems/spawn'
 
@@ -6,10 +7,15 @@ export type ShiftPhase = 'pre_shift' | 'active' | 'post_shift'
 
 export interface ShiftStats {
   landed: number
+  departed: number
+  departedOnTime: number
   diverted: number
+  raged: number
   leftInAir: number
   longestHoldSeconds: number
   longestHoldCallsign: string
+  worstDelaySeconds: number
+  worstDelayCallsign: string
   score: number
 }
 
@@ -20,6 +26,7 @@ export interface GameState {
   timeScale: number
   planes: Plane[]
   runways: Runway[]
+  gates: Gate[]
   schedule: SpawnEntry[]
   scheduleIndex: number
   events: FrameEvent[]
@@ -30,10 +37,15 @@ export interface GameState {
 export function newStats(): ShiftStats {
   return {
     landed: 0,
+    departed: 0,
+    departedOnTime: 0,
     diverted: 0,
+    raged: 0,
     leftInAir: 0,
     longestHoldSeconds: 0,
     longestHoldCallsign: '',
+    worstDelaySeconds: 0,
+    worstDelayCallsign: '',
     score: 0,
   }
 }

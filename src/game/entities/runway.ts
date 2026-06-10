@@ -33,11 +33,22 @@ export class Runway {
     }
   }
 
+  /** Where a departure waits for clearance: beside the threshold */
+  holdShortPoint(): { x: number; y: number } {
+    const { threshold } = this.geometry()
+    const off = CONFIG.runway.widthPixels / 2 + CONFIG.runway.holdShortOffsetPixels
+    const perpX = -Math.sin(this.angle * DEG)
+    const perpY = Math.cos(this.angle * DEG)
+    return { x: threshold.x + perpX * off, y: threshold.y + perpY * off }
+  }
+
+  /** Mixed arrival/departure queue. A boarding plane starts taxiing out immediately. */
   enqueue(plane: Plane): void {
-    if (plane.assignedRunway === this) return
+    if (this.queue.includes(plane)) return
     plane.assignedRunway?.removeFromQueue(plane)
     plane.assignedRunway = this
     this.queue.push(plane)
+    if (plane.state === 'boarding') plane.transition('taxiing_out')
   }
 
   removeFromQueue(plane: Plane): void {
@@ -47,15 +58,23 @@ export class Runway {
 
   /** Called each frame by the sequencing step: clear finished plane, commit next */
   sequence(): void {
-    if (this.current && this.current.state === 'departed') {
+    if (this.current?.clearOfRunway) {
       this.current = null
     }
     this.queue = this.queue.filter((p) => p.state !== 'diverted')
     while (this.current === null && this.queue.length > 0) {
-      const next = this.queue.shift()!
-      if (next.isAirborneControllable) {
-        next.transition('landing')
-        this.current = next
+      const head = this.queue[0]
+      if (head.isAirborneControllable) {
+        this.queue.shift()
+        head.transition('landing')
+        this.current = head
+      } else if (head.state === 'taxiing_out' && head.atHoldShort) {
+        this.queue.shift()
+        head.transition('departing')
+        this.current = head
+      } else {
+        // head is still taxiing to hold-short (or otherwise not ready) — strict FIFO waits
+        break
       }
     }
   }

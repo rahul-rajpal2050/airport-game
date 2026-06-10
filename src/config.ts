@@ -22,6 +22,8 @@ export const CONFIG = {
   runway: {
     count: 2,
     occupancySeconds: 8,       // how long a plane blocks the runway after touchdown
+    takeoffSeconds: 6,         // runway occupancy for a departure roll
+    holdShortOffsetPixels: 26, // departure wait point, offset from threshold
     lengthPixels: 130,
     widthPixels: 22,
     tapPaddingPixels: 14,      // extra hit-test margin for fat fingers
@@ -34,7 +36,12 @@ export const CONFIG = {
 
   gate: {
     count: 6,
-    turnaroundSeconds: 45,     // time at gate before plane is ready to depart
+    turnaroundSeconds: 30,     // time at gate before plane is ready to depart
+    terminalY: 730,            // gate row vertical position
+    firstGateX: 50,            // x of gate 0; remaining gates spaced evenly
+    spacingPixels: 58,
+    sizePixels: 36,            // gate box side length
+    tapPaddingPixels: 10,
   },
 
   approach: {
@@ -52,10 +59,12 @@ export const CONFIG = {
     speedPixelsPerSecond: 80,
     landingSpeedPixelsPerSecond: 110,
     taxiSpeedPixelsPerSecond: 40,
+    climbOutSpeedPixelsPerSecond: 140,
     initialFuel: 80,           // out of 100
     fuelDrainPerSecond: 0.4,   // while holding/approaching
     initialPatience: 100,      // out of 100
-    patienceDrainPerSecond: 0.3, // while holding
+    patienceDrainPerSecond: 0.3, // while waiting (holding, stuck, boarding)
+    scheduleSlackSeconds: 110, // deadline = spawnTime + this; delay measured from it
     hitRadiusPixels: 24,
     // Visual size
     width: 24,
@@ -71,10 +80,13 @@ export const CONFIG = {
   },
 
   scoring: {
-    landingBase: 100,                // base points per landing, scaled by patience
-    minLandingFraction: 0.2,         // landing always pays at least this fraction
-    onTimeBonus: 100,
-    lateMultiplierPerSecond: 0.002,  // score multiplier reduction per second late
+    landingBase: 40,                 // landing pays small, scaled by patience
+    departBase: 140,                 // departure pays big, scaled down by delay
+    minLandingFraction: 0.2,         // payouts floor at this fraction
+    onTimeBonus: 100,                // extra when delay <= onTimeThresholdSeconds
+    onTimeThresholdSeconds: 20,
+    lateMultiplierPerSecond: 0.005,  // departure payout reduction per second late
+    ragePenalty: 150,                // patience hit zero (fires once per plane)
     nearMissBonus: 25,
     streakMultiplierStep: 0.1,       // each consecutive near-miss adds 0.1x
     collisionPenalty: 500,

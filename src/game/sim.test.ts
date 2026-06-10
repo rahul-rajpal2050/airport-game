@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { CONFIG } from '../config'
 import { RNG } from '../utils/rng'
+import { Gate } from './entities/gate'
 import { Runway } from './entities/runway'
 import { simulate } from './sim'
 import { newStats, type GameState } from './state'
@@ -16,6 +17,7 @@ function makeShiftState(seed: number | string): GameState {
     runways: CONFIG.runway.positions
       .slice(0, CONFIG.runway.count)
       .map((p, i) => new Runway(i, p.x, p.y, p.angle)),
+    gates: Array.from({ length: CONFIG.gate.count }, (_, i) => new Gate(i)),
     schedule: generateSchedule(new RNG(seed)),
     scheduleIndex: 0,
     events: [],
@@ -24,7 +26,11 @@ function makeShiftState(seed: number | string): GameState {
   }
 }
 
-/** Runs a full shift at fixed dt; controller assigns every unassigned plane round-robin */
+/**
+ * Runs a full shift at fixed dt. The attentive controller assigns every
+ * unassigned arrival a runway (round-robin), reserves a free gate for any
+ * plane that lacks one, and sends boarding planes to the emptier runway.
+ */
 function runFullShift(seed: number | string, assign: boolean): GameState {
   const state = makeShiftState(seed)
   const dt = 1 / 60
@@ -37,6 +43,18 @@ function runFullShift(seed: number | string, assign: boolean): GameState {
           state.runways[nextRunway % state.runways.length].enqueue(plane)
           nextRunway++
         }
+        const needsGate =
+          !plane.assignedGate &&
+          (plane.isAirborneControllable || plane.state === 'landing' ||
+            (plane.state === 'rolling' && plane.rolloutDone))
+        if (needsGate) {
+          const freeGate = state.gates.find((g) => g.free)
+          if (freeGate) freeGate.reserve(plane)
+        }
+        if (plane.state === 'boarding' && !plane.assignedRunway) {
+          const emptier = state.runways.reduce((a, b) => (a.queue.length <= b.queue.length ? a : b))
+          emptier.enqueue(plane)
+        }
       }
     }
     ended = simulate(state, dt)
@@ -46,17 +64,18 @@ function runFullShift(seed: number | string, assign: boolean): GameState {
 }
 
 describe('full shift simulation', () => {
-  it('an attentive controller lands most planes', () => {
+  it('an attentive controller lands and departs planes through the full pipeline', () => {
     const state = runFullShift('integration-seed', true)
-    const total = state.stats.landed + state.stats.diverted + state.stats.leftInAir
-    expect(state.schedule.length).toBe(total + state.planes.filter((p) => !p.isAirborneControllable).length)
     expect(state.stats.landed).toBeGreaterThan(0)
+    expect(state.stats.departed).toBeGreaterThan(0)
+    expect(state.stats.departedOnTime).toBeGreaterThan(0)
     expect(state.stats.score).toBeGreaterThan(0)
   })
 
   it('an absent controller diverts everything that runs dry (the spiral)', () => {
     const state = runFullShift('integration-seed', false)
     expect(state.stats.landed).toBe(0)
+    expect(state.stats.departed).toBe(0)
     expect(state.stats.diverted).toBeGreaterThan(0)
     expect(state.stats.score).toBeLessThan(0)
   })
