@@ -1,0 +1,173 @@
+import { CONFIG } from '../config'
+import type { Plane } from './entities/plane'
+import type { Runway } from './entities/runway'
+import type { GameState } from './state'
+
+const DEG = Math.PI / 180
+
+const COLORS = {
+  bg: '#0a0e1a',
+  runway: '#2a3142',
+  runwayStripe: '#4a5568',
+  plane: '#e2e8f0',
+  planeWarning: '#facc15',
+  planeCritical: '#ef4444',
+  selection: '#4ade80',
+  assignLine: 'rgba(74, 222, 128, 0.35)',
+  holdRing: 'rgba(148, 163, 184, 0.12)',
+  hud: '#94a3b8',
+  hudBright: '#e2e8f0',
+  fuelBar: '#facc15',
+  fuelBarBg: 'rgba(148, 163, 184, 0.25)',
+} as const
+
+export function draw(ctx: CanvasRenderingContext2D, state: GameState): void {
+  const { width, height } = CONFIG.canvas
+  ctx.fillStyle = COLORS.bg
+  ctx.fillRect(0, 0, width, height)
+
+  if (state.phase === 'pre_shift') return // React menu covers the canvas
+
+  drawHoldingRings(ctx, state)
+  for (const runway of state.runways) drawRunway(ctx, runway)
+  drawAssignmentLines(ctx, state)
+  for (const plane of state.planes) drawPlane(ctx, plane, plane.id === state.selectedPlaneId)
+  drawHud(ctx, state)
+}
+
+function drawHoldingRings(ctx: CanvasRenderingContext2D, state: GameState): void {
+  const { holdingCenterX, holdingCenterY, holdingRadiusBase, holdingRadiusStep } = CONFIG.approach
+  let rings = 1
+  for (const p of state.planes) {
+    if (p.state === 'holding') rings = Math.max(rings, p.ringIndex + 1)
+  }
+  ctx.strokeStyle = COLORS.holdRing
+  ctx.lineWidth = 1
+  for (let i = 0; i < rings; i++) {
+    ctx.beginPath()
+    ctx.arc(holdingCenterX, holdingCenterY, holdingRadiusBase + i * holdingRadiusStep, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+}
+
+function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway): void {
+  const { lengthPixels, widthPixels } = CONFIG.runway
+  ctx.save()
+  ctx.translate(runway.x, runway.y)
+  ctx.rotate(runway.angle * DEG)
+
+  ctx.fillStyle = COLORS.runway
+  ctx.fillRect(-lengthPixels / 2, -widthPixels / 2, lengthPixels, widthPixels)
+
+  // centerline dashes
+  ctx.strokeStyle = COLORS.runwayStripe
+  ctx.lineWidth = 2
+  ctx.setLineDash([8, 8])
+  ctx.beginPath()
+  ctx.moveTo(-lengthPixels / 2 + 6, 0)
+  ctx.lineTo(lengthPixels / 2 - 6, 0)
+  ctx.stroke()
+  ctx.setLineDash([])
+
+  // threshold stripe at touchdown end
+  ctx.fillStyle = COLORS.runwayStripe
+  ctx.fillRect(-lengthPixels / 2, -widthPixels / 2, 4, widthPixels)
+
+  // occupied indicator
+  if (!runway.free) {
+    ctx.strokeStyle = COLORS.planeCritical
+    ctx.lineWidth = 1.5
+    ctx.strokeRect(-lengthPixels / 2 - 3, -widthPixels / 2 - 3, lengthPixels + 6, widthPixels + 6)
+  }
+  ctx.restore()
+
+  // queue count
+  if (runway.queue.length > 0) {
+    ctx.fillStyle = COLORS.hudBright
+    ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
+    ctx.textAlign = 'center'
+    ctx.fillText(`+${runway.queue.length}`, runway.x, runway.y + widthPixels + 14)
+  }
+}
+
+function drawAssignmentLines(ctx: CanvasRenderingContext2D, state: GameState): void {
+  ctx.strokeStyle = COLORS.assignLine
+  ctx.lineWidth = 1
+  for (const plane of state.planes) {
+    if (!plane.isAirborneControllable || !plane.assignedRunway) continue
+    ctx.beginPath()
+    ctx.moveTo(plane.x, plane.y)
+    ctx.lineTo(plane.assignedRunway.x, plane.assignedRunway.y)
+    ctx.stroke()
+  }
+}
+
+function planeColor(plane: Plane): string {
+  if (plane.fuel <= CONFIG.ui.fuelWarningThreshold / 2) return COLORS.planeCritical
+  if (plane.fuel <= CONFIG.ui.fuelWarningThreshold) return COLORS.planeWarning
+  return COLORS.plane
+}
+
+function drawPlane(ctx: CanvasRenderingContext2D, plane: Plane, selected: boolean): void {
+  if (plane.state === 'departed' || plane.state === 'diverted') return
+  const { width: w, height: h } = CONFIG.plane
+
+  ctx.save()
+  ctx.translate(plane.x, plane.y)
+
+  if (selected) {
+    ctx.strokeStyle = COLORS.selection
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.arc(0, 0, CONFIG.plane.hitRadiusPixels * 0.8, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+
+  ctx.rotate(plane.heading)
+  ctx.fillStyle = planeColor(plane)
+  ctx.fillRect(-w / 2, -h / 2, w, h)
+  // nose marker so heading is readable
+  ctx.fillStyle = COLORS.bg
+  ctx.fillRect(w / 2 - 5, -2, 3, 4)
+  ctx.restore()
+
+  // callsign + fuel bar (only when airborne)
+  if (plane.isAirborneControllable) {
+    ctx.fillStyle = COLORS.hud
+    ctx.font = `${CONFIG.ui.hudFontSize - 2}px monospace`
+    ctx.textAlign = 'center'
+    ctx.fillText(plane.callsign, plane.x, plane.y - h - 8)
+
+    if (plane.fuel <= CONFIG.ui.fuelWarningThreshold) {
+      const barW = w + 6
+      ctx.fillStyle = COLORS.fuelBarBg
+      ctx.fillRect(plane.x - barW / 2, plane.y - h - 6, barW, 3)
+      ctx.fillStyle = plane.fuel <= CONFIG.ui.fuelWarningThreshold / 2 ? COLORS.planeCritical : COLORS.fuelBar
+      ctx.fillRect(plane.x - barW / 2, plane.y - h - 6, barW * (plane.fuel / 100), 3)
+    }
+  }
+}
+
+function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
+  const { width } = CONFIG.canvas
+  const pad = CONFIG.ui.hudPadding
+
+  const remaining = Math.max(0, CONFIG.shift.durationSeconds - state.shiftTime)
+  const m = Math.floor(remaining / 60)
+  const s = Math.floor(remaining % 60)
+
+  ctx.font = `bold ${CONFIG.ui.hudFontSize + 4}px monospace`
+  ctx.fillStyle = remaining <= 30 ? COLORS.planeWarning : COLORS.hudBright
+  ctx.textAlign = 'left'
+  ctx.fillText(`${m}:${String(s).padStart(2, '0')}`, pad, pad + 16)
+
+  ctx.textAlign = 'right'
+  ctx.fillStyle = COLORS.hudBright
+  ctx.fillText(String(state.stats.score), width - pad, pad + 16)
+
+  const airborne = state.planes.filter((p) => p.isAirborneControllable).length
+  ctx.font = `${CONFIG.ui.hudFontSize}px monospace`
+  ctx.fillStyle = COLORS.hud
+  ctx.textAlign = 'center'
+  ctx.fillText(`${airborne} inbound`, width / 2, pad + 16)
+}
