@@ -96,21 +96,23 @@ export const CONFIG = {
   },
 
   runway: {
-    count: 2,
+    count: 3,                  // default; player picks 2/3/5 on the menu
     occupancySeconds: 8,       // how long a plane blocks the runway after touchdown
     takeoffSeconds: 6,         // runway occupancy for a departure roll
     holdShortOffsetPixels: 26, // departure wait point, offset from threshold
     lengthPixels: 150,
     widths: { small: 20, large: 28 }, // wide-body strips are visibly wider
     tapPaddingPixels: 14,      // extra hit-test margin
-    // runway positions in logical canvas coords; index 2 is the Third Runway perk.
-    // The V-terminal owns the bottom of the field, so runways sit mid-field.
-    // Large planes can only use large runways; index 0 is large so every
-    // difficulty (including hard's single strip) can serve both classes.
+    // Vertical strips in a row immediately above the V-terminal: arrivals land
+    // downward (threshold at top), departures roll upward away from the gates.
+    // Ordered center-out so slice(0, n) works for the 2/3/5 runway setting:
+    // the large center strip is always index 0, so wide-bodies always have a home.
     positions: [
-      { x: 320, y: 330, angle: -15, size: 'large' },
-      { x: 640, y: 330, angle: 15, size: 'small' },
-      { x: 480, y: 272, angle: 0, size: 'large' },
+      { x: 480, y: 330, angle: 90, size: 'large' },  // center, large
+      { x: 580, y: 330, angle: 90, size: 'small' },
+      { x: 380, y: 330, angle: 90, size: 'small' },
+      { x: 680, y: 330, angle: 90, size: 'small' },
+      { x: 280, y: 330, angle: 90, size: 'small' },
     ] as { x: number; y: number; angle: number; size: PlaneSize }[],
   },
 
@@ -264,10 +266,11 @@ export const CONFIG = {
     ] as GameEventDef[],
   },
 
+  // Difficulty is a pure traffic dial; runway count is its own setting now.
   difficulty: {
-    easy: { label: 'EASY', extraRunways: 1, spawnRateMult: 0.85 },
-    normal: { label: 'NORMAL', extraRunways: 0, spawnRateMult: 1 },
-    hard: { label: 'HARD', extraRunways: -1, spawnRateMult: 0.75 },
+    easy: { label: 'EASY', spawnRateMult: 0.8 },
+    normal: { label: 'NORMAL', spawnRateMult: 1 },
+    hard: { label: 'HARD', spawnRateMult: 1.15 },
   },
 
   perks: {

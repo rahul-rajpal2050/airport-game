@@ -45,13 +45,13 @@ export class Runway {
     }
   }
 
-  /** Where a departure waits for clearance: beside the threshold */
+  /** Where a departure waits for clearance: beside the rollout end, where its takeoff roll starts */
   holdShortPoint(): { x: number; y: number } {
-    const { threshold } = this.geometry()
+    const { end } = this.geometry()
     const off = this.width / 2 + CONFIG.runway.holdShortOffsetPixels
     const perpX = -Math.sin(this.angle * DEG)
     const perpY = Math.cos(this.angle * DEG)
-    return { x: threshold.x + perpX * off, y: threshold.y + perpY * off }
+    return { x: end.x + perpX * off, y: end.y + perpY * off }
   }
 
   /** Mixed arrival/departure queue. A boarding plane starts taxiing out immediately. */

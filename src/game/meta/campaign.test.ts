@@ -125,30 +125,29 @@ describe('perk draft', () => {
 })
 
 describe('settings', () => {
-  it('difficulty controls runway count: easy 3, normal 2, hard 1', () => {
+  it('runway count setting controls the row: 2, 3, or 5, center always large', () => {
+    for (const n of [2, 3, 5]) {
+      updateSettings({ runwayCount: n })
+      startFreeShift()
+      expect(getState().runways.length).toBe(n)
+      expect(getState().runways[0].size).toBe('large')
+      expect(getState().runways.filter((r) => r.size === 'large').length).toBe(1)
+    }
+  })
+
+  it('difficulty no longer changes runway count, only traffic', () => {
+    updateSettings({ runwayCount: 3, difficulty: 'hard' })
+    startFreeShift()
+    expect(getState().runways.length).toBe(3)
     updateSettings({ difficulty: 'easy' })
     startFreeShift()
     expect(getState().runways.length).toBe(3)
-
-    updateSettings({ difficulty: 'normal' })
-    startFreeShift()
-    expect(getState().runways.length).toBe(2)
-
-    updateSettings({ difficulty: 'hard' })
-    startFreeShift()
-    expect(getState().runways.length).toBe(1)
   })
 
-  it('hard cannot go below one runway even stacked with archetype closures', () => {
-    updateSettings({ difficulty: 'hard' })
-    startFreeShift()
-    expect(getState().runways.length).toBeGreaterThanOrEqual(1)
-  })
-
-  it('third runway perk on easy clamps at available runway positions', () => {
-    updateSettings({ difficulty: 'easy' }) // +1 runway
+  it('runway perk on the full row clamps at available positions', () => {
+    updateSettings({ runwayCount: 5 })
     startRun()
-    getRun()!.perkIds = ['third_runway'] // +1 more = 4, but only 3 positions exist
+    getRun()!.perkIds = ['third_runway'] // +1 = 6, but only 5 positions exist
     draftPerk(null) // skip the draft; starts the next shift with current perks
     expect(getState().runways.length).toBe(CONFIG.runway.positions.length)
   })

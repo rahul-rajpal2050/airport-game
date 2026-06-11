@@ -144,13 +144,14 @@ export class Plane {
       this.atHoldShort = false
       this.assignedGate?.release() // gate frees the moment the plane pushes back
     } else if (to === 'departing' && this.assignedRunway) {
+      // departures roll opposite to arrivals: end -> threshold, away from the terminal
       const { threshold, end } = this.assignedRunway.geometry()
-      this.rollFrom = threshold
-      this.rollTo = end
+      this.rollFrom = end
+      this.rollTo = threshold
       this.rollElapsed = 0
-      this.x = threshold.x
-      this.y = threshold.y
-      this.heading = Math.atan2(end.y - threshold.y, end.x - threshold.x)
+      this.x = end.x
+      this.y = end.y
+      this.heading = Math.atan2(threshold.y - end.y, threshold.x - end.x)
     }
   }
 

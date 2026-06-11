@@ -33,6 +33,8 @@ export interface ShiftOptions {
   nearMisses?: boolean
   /** player's gate-count setting (perk extraGates added on top) */
   gateCount?: number
+  /** player's runway-count setting (perk extraRunways added on top) */
+  runwayCount?: number
 }
 
 export function startShift(seed: number | string, options?: ShiftOptions): void {
@@ -46,7 +48,10 @@ export function startShift(seed: number | string, options?: ShiftOptions): void 
 
   const runwayCount = Math.max(
     1,
-    Math.min(CONFIG.runway.count + state.modifiers.extraRunways, CONFIG.runway.positions.length)
+    Math.min(
+      (options?.runwayCount ?? CONFIG.runway.count) + state.modifiers.extraRunways,
+      CONFIG.runway.positions.length
+    )
   )
   state.runways = CONFIG.runway.positions
     .slice(0, runwayCount)

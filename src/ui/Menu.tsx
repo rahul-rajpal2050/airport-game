@@ -102,9 +102,20 @@ export function Menu() {
             {n}
           </button>
         ))}
+        <span style={{ color: '#334155' }}>|</span>
+        <span style={{ color: '#64748b', fontFamily: 'monospace', fontSize: 12 }}>RUNWAYS</span>
+        {[2, 3, 5].map((n) => (
+          <button
+            key={n}
+            style={settings.runwayCount === n ? toggleActiveStyle : toggleStyle}
+            onClick={() => updateSettings({ runwayCount: n })}
+          >
+            {n}
+          </button>
+        ))}
       </div>
-      <div style={{ color: '#475569', fontSize: 11, maxWidth: 420 }}>
-        easy opens a third runway — hard leaves you one strip
+      <div style={{ color: '#475569', fontSize: 11, maxWidth: 460 }}>
+        difficulty sets traffic volume — the center runway is the large one
       </div>
       {records.bestRunScore > 0 && (
         <div style={{ color: '#475569', fontSize: 12 }}>

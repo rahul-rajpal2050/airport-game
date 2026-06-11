@@ -315,6 +315,38 @@ describe('Boarding departure window', () => {
   })
 })
 
+describe('Vertical runway flow', () => {
+  it('arrivals roll downward, departures roll upward away from the terminal', () => {
+    const runway = new Runway(0, 480, 330, 90, 'large') // vertical strip
+    const gate = new Gate(0)
+    const plane = makePlane()
+    const ctx = makeCtx()
+    gate.reserve(plane)
+    plane.transition('holding')
+    plane.ringIndex = 0
+    runway.enqueue(plane)
+    runway.sequence()
+
+    // arrival: touchdown at the top threshold, rollout moves DOWN toward the gates
+    runUntil(plane, ctx, () => plane.state === 'rolling')
+    const yAtTouchdown = plane.y
+    plane.update(2, ctx)
+    expect(plane.y).toBeGreaterThan(yAtTouchdown)
+
+    runUntil(plane, ctx, () => plane.state === 'boarding', 200)
+    runway.enqueue(plane)
+    runUntil(plane, ctx, () => plane.atHoldShort, 60)
+    // hold-short sits near the rollout end (bottom), not the top threshold
+    expect(plane.y).toBeGreaterThan(runway.y)
+
+    runway.sequence()
+    expect(plane.state).toBe('departing')
+    const yAtRollStart = plane.y
+    plane.update(2, ctx)
+    expect(plane.y).toBeLessThan(yAtRollStart) // takeoff roll moves UP, away from gates
+  })
+})
+
 describe('Runway mixed queue', () => {
   it('serves a departure then an arrival in FIFO order', () => {
     const runway = new Runway(0, 130, 560, -20)

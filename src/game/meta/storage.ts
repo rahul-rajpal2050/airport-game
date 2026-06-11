@@ -14,6 +14,7 @@ export interface Settings {
   difficulty: Difficulty
   nearMisses: boolean
   gateCount: number
+  runwayCount: number
 }
 
 export interface SaveData {
@@ -28,7 +29,7 @@ export interface SaveData {
 }
 
 export function defaultSettings(): Settings {
-  return { difficulty: 'normal', nearMisses: true, gateCount: 10 }
+  return { difficulty: 'normal', nearMisses: true, gateCount: 10, runwayCount: 3 }
 }
 
 export interface StorageBackend {

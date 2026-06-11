@@ -53,13 +53,12 @@ export function startFreeShift(): void {
   active = false
   ui = null
   const diff = CONFIG.difficulty[save.settings.difficulty]
-  const modifiers = identityModifiers()
-  modifiers.extraRunways += diff.extraRunways
   startShift(randomSessionSeed(), {
-    modifiers,
+    modifiers: identityModifiers(),
     spawnRateMult: diff.spawnRateMult,
     nearMisses: save.settings.nearMisses,
     gateCount: save.settings.gateCount,
+    runwayCount: save.settings.runwayCount,
   })
 }
 
@@ -111,15 +110,14 @@ function beginShift(): void {
   active = true
   ui = null
   const diff = CONFIG.difficulty[save.settings.difficulty]
-  const modifiers = modifiersFor(run)
-  modifiers.extraRunways += diff.extraRunways
   startShift(shiftSeed(run), {
-    modifiers,
+    modifiers: modifiersFor(run),
     archetype: currentArchetype(run),
     hudReputation: run.reputation,
     spawnRateMult: diff.spawnRateMult,
     nearMisses: save.settings.nearMisses,
     gateCount: save.settings.gateCount,
+    runwayCount: save.settings.runwayCount,
   })
 }
 
