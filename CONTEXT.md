@@ -81,6 +81,11 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
 
 ## Recent Changes
+[2026-06-11] Phase 4 complete: roguelite campaign. 5-shift runs with archetypes
+(morning rush, storm front, VIP day, understaffed, chaos); reputation as currency;
+6 perks drafted between shifts (cost rep, deterministic per-run drafts); versioned
+localStorage persistence with Continue Run. Landscape 960x600 canvas for laptop.
+63 tests passing.
 [2026-06-11] Phase 3 complete: data-driven events system. Effect-primitive
 interpreter; 4 launch events (medical, fog, bird strike, VIP); EventDialog with
 8s auto-resolve under deep slow-mo; go-arounds via pre-rolled risk lottery;
@@ -105,9 +110,14 @@ Dev console handle window.__game (DEV only) for feel-tuning.
   trade-offs applied through effect primitives (close_runway, patience/fuel mults,
   go_around_risk, mark_plane, queue_jump, next_rollout_mult, score_delta).
   Adding event #5 = one def in CONFIG.events.defs
-- Tests: 46 across 6 files; determinism contract holds with events + risk lottery
-  (same seed + same scripted choices = identical stats)
+- Campaign live: runSeed derives shift seeds (`${runSeed}-shift${i}`) so whole runs
+  are deterministic/replayable — this is the hook Phase 5 daily runs will reuse.
+  Campaign controller (src/game/meta/campaign.ts) registers via loop.onShiftEnd;
+  the sim stays campaign-agnostic. Free Shift mode unchanged.
+- Tests: 63 across 8 files; determinism contract holds with events, risk lottery,
+  and perk modifiers active
 - Git: clean history, one commit per feature
-- Next: Phase 4 roguelite meta (reputation currency, perk draft, localStorage)
-- Deferred known issue: 10+ plane holding stacks orbit partially off-screen
-  (outer ring radius exceeds canvas width)
+- Next: Phase 5 daily challenge + leaderboard (Supabase), then Phase 6 visual
+  overhaul (2.5D isometric, laptop-first)
+- Known artifact (harmless): jumping shiftTime via __game dumps all spawns in one
+  tick and farms near-miss streaks — impossible in real play, ignore in dev tests

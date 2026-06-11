@@ -1,9 +1,12 @@
 import { getState, startShift } from '../game/loop'
+import { advance, getUi, isCampaignActive } from '../game/meta/campaign'
 import { randomSessionSeed } from '../utils/rng'
 import { buttonStyle, overlayStyle } from './overlay'
 
 export function ScoreScreen() {
   const { stats, seed } = getState()
+  const campaign = isCampaignActive() ? getUi() : null
+
   return (
     <div style={overlayStyle}>
       <h2 style={{ fontSize: 22, margin: 0, color: '#94a3b8' }}>SHIFT COMPLETE</h2>
@@ -37,10 +40,27 @@ export function ScoreScreen() {
         {stats.leftInAir > 0 && (
           <div style={{ color: '#94a3b8' }}>{stats.leftInAir} still inbound at end of shift</div>
         )}
+        {campaign && (
+          <div
+            style={{
+              color: campaign.lastRepDelta >= 0 ? '#4ade80' : '#ef4444',
+              fontWeight: 'bold',
+            }}
+          >
+            reputation {campaign.lastRepDelta >= 0 ? '+' : ''}
+            {campaign.lastRepDelta}
+          </div>
+        )}
       </div>
-      <button style={buttonStyle} onClick={() => startShift(randomSessionSeed())}>
-        PLAY AGAIN
-      </button>
+      {campaign ? (
+        <button style={buttonStyle} onClick={advance}>
+          CONTINUE
+        </button>
+      ) : (
+        <button style={buttonStyle} onClick={() => startShift(randomSessionSeed())}>
+          PLAY AGAIN
+        </button>
+      )}
       <div style={{ color: '#475569', fontSize: 11 }}>seed {String(seed)}</div>
     </div>
   )

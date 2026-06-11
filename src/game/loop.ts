@@ -63,10 +63,24 @@ export function startShift(seed: number | string, options?: ShiftOptions): void 
   gameStore.notify()
 }
 
+let shiftEndHandler: ((stats: GameState['stats']) => void) | null = null
+
+/** Campaign layer registers here; the sim stays campaign-agnostic */
+export function onShiftEnd(handler: (stats: GameState['stats']) => void): void {
+  shiftEndHandler = handler
+}
+
 function endShift(): void {
   state.phase = 'post_shift'
   state.stats.leftInAir = state.planes.filter((p) => p.isAirborneControllable).length
   state.selectedPlaneId = null
+  shiftEndHandler?.(state.stats)
+  gameStore.notify()
+}
+
+/** Back to the pre-shift menu (campaign summary dismissed, etc.) */
+export function returnToMenu(): void {
+  state = newGameState(rng.seed)
   gameStore.notify()
 }
 

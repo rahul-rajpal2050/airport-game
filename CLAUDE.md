@@ -41,6 +41,9 @@ src/
     juice/
       audio.ts      -- Synthesized Web Audio sounds (no asset files)
       juice.ts      -- Event consumer: sound + screen shake (never game logic)
+    meta/
+      campaign.ts   -- Run lifecycle, reputation, perk drafts (sim-agnostic)
+      storage.ts    -- Versioned localStorage, injectable backend for tests
   utils/
     rng.ts          -- Seeded RNG wrapper. Only source of randomness.
   ui/

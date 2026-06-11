@@ -1,0 +1,206 @@
+import { CONFIG, identityModifiers, type Modifiers, type PerkDef, type ShiftArchetype } from '../../config'
+import { RNG, randomSessionSeed } from '../../utils/rng'
+import { onShiftEnd, returnToMenu, startShift } from '../loop'
+import { gameStore, type ShiftStats } from '../state'
+import { emptySave, loadSave, persistSave, type RunState, type SaveData } from './storage'
+
+onShiftEnd((stats) => processShiftEnd(stats))
+
+export type CampaignScreen = 'score' | 'draft' | 'summary'
+
+interface CampaignUiState {
+  screen: CampaignScreen
+  lastRepDelta: number
+  outcome: 'victory' | 'fired' | null
+}
+
+let save: SaveData = loadSave()
+let active = false
+let ui: CampaignUiState | null = null
+
+export function isCampaignActive(): boolean {
+  return active
+}
+
+export function getRun(): RunState | null {
+  return save.run
+}
+
+export function getRecords(): SaveData['records'] {
+  return save.records
+}
+
+export function getUi(): CampaignUiState | null {
+  return ui
+}
+
+export function hasSavedRun(): boolean {
+  return save.run !== null
+}
+
+function shiftSeed(run: RunState): string {
+  return `${run.runSeed}-shift${run.shiftIndex}`
+}
+
+export function currentArchetype(run: RunState): ShiftArchetype {
+  const list = CONFIG.campaign.archetypes
+  return list[Math.min(run.shiftIndex, list.length - 1)]
+}
+
+export function modifiersFor(run: RunState): Modifiers {
+  const m = identityModifiers()
+  for (const id of run.perkIds) {
+    const perk = CONFIG.perks.defs.find((p) => p.id === id)
+    if (!perk) continue
+    for (const [key, value] of Object.entries(perk.modifiers) as [keyof Modifiers, number][]) {
+      if (key === 'extraRunways' || key === 'extraGates' || key === 'eventWarningSeconds') {
+        m[key] += value
+      } else {
+        m[key] *= value
+      }
+    }
+  }
+  return m
+}
+
+export function startRun(): void {
+  save.run = {
+    runSeed: `run-${randomSessionSeed()}`,
+    shiftIndex: 0,
+    reputation: CONFIG.reputation.initial,
+    perkIds: [],
+    runScore: 0,
+  }
+  persistSave(save)
+  beginShift()
+}
+
+export function continueRun(): void {
+  if (!save.run) return
+  beginShift()
+}
+
+function beginShift(): void {
+  const run = save.run
+  if (!run) return
+  active = true
+  ui = null
+  startShift(shiftSeed(run), {
+    modifiers: modifiersFor(run),
+    archetype: currentArchetype(run),
+    hudReputation: run.reputation,
+  })
+}
+
+/** Reputation delta from shift stats, scaled by the archetype (VIP Day x2) */
+export function reputationDelta(stats: ShiftStats, archetype: ShiftArchetype): number {
+  const R = CONFIG.reputation
+  const raw =
+    stats.departedOnTime * R.onTimeDelta +
+    stats.raged * R.delayDelta +
+    stats.diverted * R.diversionDelta
+  return Math.round(raw * (archetype.repDeltaMult ?? 1))
+}
+
+/** Called by the gameStore listener when a campaign shift reaches post_shift */
+export function processShiftEnd(stats: ShiftStats): void {
+  const run = save.run
+  if (!run || !active) return
+  const archetype = currentArchetype(run)
+  const delta = reputationDelta(stats, archetype)
+
+  run.reputation = Math.max(
+    CONFIG.reputation.min,
+    Math.min(CONFIG.reputation.max, run.reputation + delta)
+  )
+  run.runScore += stats.score
+  run.shiftIndex++
+  save.records.bestShiftScore = Math.max(save.records.bestShiftScore, stats.score)
+
+  const fired = run.reputation <= CONFIG.reputation.min
+  const victory = !fired && run.shiftIndex >= CONFIG.campaign.shiftsPerRun
+  ui = {
+    screen: 'score',
+    lastRepDelta: delta,
+    outcome: fired ? 'fired' : victory ? 'victory' : null,
+  }
+  persistSave(save)
+}
+
+/** Score screen Continue button: to the draft, or to the run summary if the run ended */
+export function advance(): void {
+  if (!ui) return
+  if (ui.outcome) {
+    finishRun()
+    ui = { ...ui, screen: 'summary' }
+  } else {
+    ui = { ...ui, screen: 'draft' }
+  }
+  gameStore.notify()
+}
+
+function finishRun(): void {
+  const run = save.run
+  if (!run) return
+  save.records.bestRunScore = Math.max(save.records.bestRunScore, run.runScore)
+  if (ui?.outcome === 'victory') save.records.runsCompleted++
+  persistSave(save)
+}
+
+/** Deterministic 3-perk draft for the upcoming shift; excludes owned perks */
+export function draftChoices(): PerkDef[] {
+  const run = save.run
+  if (!run) return []
+  const pool = CONFIG.perks.defs.filter((p) => !run.perkIds.includes(p.id))
+  const rng = new RNG(`${run.runSeed}-draft${run.shiftIndex}`)
+  const picks: PerkDef[] = []
+  const candidates = [...pool]
+  while (picks.length < CONFIG.perks.draftSize && candidates.length > 0) {
+    picks.push(candidates.splice(rng.int(0, candidates.length - 1), 1)[0])
+  }
+  return picks
+}
+
+/** Pick a perk (pays reputation) or pass null to skip, then start the next shift */
+export function draftPerk(perkId: string | null): void {
+  const run = save.run
+  if (!run) return
+  if (perkId) {
+    const perk = CONFIG.perks.defs.find((p) => p.id === perkId)
+    if (perk && run.reputation > perk.repCost && !run.perkIds.includes(perk.id)) {
+      run.reputation -= perk.repCost
+      run.perkIds.push(perk.id)
+    }
+  }
+  persistSave(save)
+  beginShift()
+  gameStore.notify()
+}
+
+/** Run summary dismissed: clear the run, back to menu */
+export function closeRun(): void {
+  save.run = null
+  active = false
+  ui = null
+  persistSave(save)
+  returnToMenu()
+}
+
+export function abandonRun(): void {
+  closeRun()
+}
+
+/** Test hook: reload save from the backend (after setStorageBackend) */
+export function reloadSave(): void {
+  save = loadSave()
+  active = false
+  ui = null
+}
+
+/** Test hook: wipe everything */
+export function resetCampaign(): void {
+  save = emptySave()
+  persistSave(save)
+  active = false
+  ui = null
+}

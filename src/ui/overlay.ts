@@ -25,3 +25,12 @@ export const buttonStyle: CSSProperties = {
   borderRadius: 6,
   cursor: 'pointer',
 }
+
+export const secondaryButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  fontSize: 15,
+  padding: '10px 24px',
+  background: 'transparent',
+  color: '#4ade80',
+  border: '1px solid #4ade80',
+}
