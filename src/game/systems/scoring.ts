@@ -8,13 +8,22 @@ export function applyScoring(state: GameState): void {
     switch (event.type) {
       case 'landed': {
         const frac = Math.max(event.plane.patience / CONFIG.plane.initialPatience, S.minLandingFraction)
-        state.stats.score += Math.round(S.landingBase * frac)
+        const kindMult = event.plane.kind === 'vip' ? CONFIG.events.vip.scoreMult : 1
+        state.stats.score += Math.round(S.landingBase * frac * kindMult)
+        if (
+          event.plane.kind === 'medical' &&
+          event.plane.kindDeadline !== null &&
+          state.shiftTime <= event.plane.kindDeadline
+        ) {
+          state.stats.score += CONFIG.events.medical.onTimeLandBonus
+        }
         state.stats.landed++
         break
       }
       case 'departed_ok': {
         const frac = Math.max(1 - event.delaySeconds * S.lateMultiplierPerSecond, S.minLandingFraction)
-        state.stats.score += Math.round(S.departBase * frac)
+        const kindMult = event.plane.kind === 'vip' ? CONFIG.events.vip.scoreMult : 1
+        state.stats.score += Math.round(S.departBase * frac * kindMult)
         state.stats.departed++
         if (event.delaySeconds <= S.onTimeThresholdSeconds) {
           state.stats.score += S.onTimeBonus
@@ -26,16 +35,20 @@ export function applyScoring(state: GameState): void {
         }
         break
       }
-      case 'diverted':
-        state.stats.score -= S.diversionPenalty
+      case 'diverted': {
+        const kindMult = event.plane.kind === 'medical' ? CONFIG.events.medical.divertPenaltyMult : 1
+        state.stats.score -= Math.round(S.diversionPenalty * kindMult)
         state.stats.diverted++
         state.streak = 0
         break
-      case 'raged':
-        state.stats.score -= S.ragePenalty
+      }
+      case 'raged': {
+        const kindMult = event.plane.kind === 'vip' ? CONFIG.events.vip.ragePenaltyMult : 1
+        state.stats.score -= Math.round(S.ragePenalty * kindMult)
         state.stats.raged++
         state.streak = 0
         break
+      }
       case 'near_miss': {
         state.streak++
         state.stats.nearMisses++

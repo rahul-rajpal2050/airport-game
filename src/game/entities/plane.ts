@@ -15,10 +15,12 @@ export type PlaneState =
   | 'departed'
   | 'diverted'
 
+export type PlaneKind = 'normal' | 'medical' | 'vip'
+
 const ALLOWED: Partial<Record<PlaneState, PlaneState[]>> = {
   approaching: ['holding', 'landing', 'diverted'],
   holding: ['landing', 'diverted'],
-  landing: ['rolling'],
+  landing: ['rolling', 'approaching'], // approaching = go-around
   rolling: ['taxiing'],
   taxiing: ['at_gate'],
   at_gate: ['boarding'],
@@ -28,15 +30,35 @@ const ALLOWED: Partial<Record<PlaneState, PlaneState[]>> = {
 }
 
 export type FrameEvent =
-  | { type: 'spawned' | 'landed' | 'diverted' | 'raged' | 'boarding_ready'; plane: Plane }
+  | { type: 'spawned' | 'landed' | 'diverted' | 'raged' | 'boarding_ready' | 'go_around'; plane: Plane }
   | { type: 'departed_ok'; plane: Plane; delaySeconds: number }
   | { type: 'near_miss'; a: Plane; b: Plane }
+  | { type: 'event_fired'; defId: string }
 
 export interface UpdateContext {
   events: FrameEvent[]
   shiftTime: number
   /** ring indices currently occupied by holding planes, for slot assignment */
   occupiedRings: Set<number>
+  /** global event-effect multipliers (1 when no event is active) */
+  patienceMult: number
+  fuelMult: number
+  /** true = this landing must go around (risk roll already consumed) */
+  goAround: (runwayId: number) => boolean
+  /** rollout duration multiplier for a plane entering the runway (bird strike) */
+  consumeRolloutMult: () => number
+}
+
+export function neutralContext(shiftTime = 0): UpdateContext {
+  return {
+    events: [],
+    shiftTime,
+    occupiedRings: new Set(),
+    patienceMult: 1,
+    fuelMult: 1,
+    goAround: () => false,
+    consumeRolloutMult: () => 1,
+  }
 }
 
 const DEG = Math.PI / 180
@@ -50,6 +72,9 @@ export class Plane {
   y: number
   heading = 0 // radians
   state: PlaneState = 'approaching'
+  kind: PlaneKind = 'normal'
+  kindDeadline: number | null = null // medical: must be on the ground by this shiftTime
+  rolloutMult = 1
   fuel: number
   patience: number = CONFIG.plane.initialPatience
   raged = false
@@ -152,7 +177,7 @@ export class Plane {
         this.updateHolding(dt, ctx)
         break
       case 'landing':
-        this.updateLanding(dt)
+        this.updateLanding(dt, ctx)
         break
       case 'rolling':
         this.updateRolling(dt, ctx)
@@ -180,7 +205,8 @@ export class Plane {
   private drainPatience(dt: number, ctx: UpdateContext): void {
     if (this.state === 'holding') this.holdSeconds += dt
     if (!this.isWaiting || this.raged) return
-    this.patience = Math.max(0, this.patience - CONFIG.plane.patienceDrainPerSecond * dt)
+    const mult = ctx.patienceMult * (this.kind === 'vip' ? CONFIG.events.vip.patienceDrainMult : 1)
+    this.patience = Math.max(0, this.patience - CONFIG.plane.patienceDrainPerSecond * mult * dt)
     if (this.patience === 0) {
       this.raged = true
       ctx.events.push({ type: 'raged', plane: this })
@@ -188,7 +214,8 @@ export class Plane {
   }
 
   private drainFuel(dt: number, ctx: UpdateContext): boolean {
-    this.fuel -= CONFIG.plane.fuelDrainPerSecond * dt
+    const mult = ctx.fuelMult * (this.kind === 'medical' ? CONFIG.events.medical.fuelDrainMult : 1)
+    this.fuel -= CONFIG.plane.fuelDrainPerSecond * mult * dt
     if (this.fuel <= 0) {
       this.fuel = 0
       this.transition('diverted')
@@ -232,15 +259,27 @@ export class Plane {
     this.heading = this.orbitAngle + Math.PI / 2
   }
 
-  private updateLanding(dt: number): void {
+  private updateLanding(dt: number, ctx: UpdateContext): void {
     const dx = this.rollFrom.x - this.x
     const dy = this.rollFrom.y - this.y
     const dist = Math.hypot(dx, dy)
     const step = CONFIG.plane.landingSpeedPixelsPerSecond * dt
     if (dist <= step) {
+      // at the threshold: low-visibility / debris risk can force a go-around
+      if (this.assignedRunway && ctx.goAround(this.assignedRunway.id)) {
+        this.assignedRunway.abortLanding(this)
+        this.transition('approaching')
+        this.heading = Math.atan2(
+          CONFIG.approach.holdingCenterY - this.y,
+          CONFIG.approach.holdingCenterX - this.x
+        )
+        ctx.events.push({ type: 'go_around', plane: this })
+        return
+      }
       this.x = this.rollFrom.x
       this.y = this.rollFrom.y
       this.heading = Math.atan2(this.rollTo.y - this.rollFrom.y, this.rollTo.x - this.rollFrom.x)
+      this.rolloutMult = ctx.consumeRolloutMult()
       this.transition('rolling')
       return
     }
@@ -252,7 +291,7 @@ export class Plane {
   private updateRolling(dt: number, ctx: UpdateContext): void {
     if (!this.rolloutDone) {
       this.rollElapsed += dt
-      const t = Math.min(this.rollElapsed / CONFIG.runway.occupancySeconds, 1)
+      const t = Math.min(this.rollElapsed / (CONFIG.runway.occupancySeconds * this.rolloutMult), 1)
       const ease = 1 - (1 - t) * (1 - t)
       this.x = this.rollFrom.x + (this.rollTo.x - this.rollFrom.x) * ease
       this.y = this.rollFrom.y + (this.rollTo.y - this.rollFrom.y) * ease

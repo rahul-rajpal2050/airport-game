@@ -10,6 +10,7 @@ export class Runway {
   readonly angle: number // degrees
   queue: Plane[] = []
   current: Plane | null = null
+  closedUntil = 0 // shiftTime; sequence() won't commit while closed
 
   constructor(id: number, x: number, y: number, angle: number) {
     this.id = id
@@ -56,12 +57,19 @@ export class Runway {
     if (plane.assignedRunway === this) plane.assignedRunway = null
   }
 
+  /** A committed landing aborts at the threshold: free the strip, back of the line */
+  abortLanding(plane: Plane): void {
+    if (this.current === plane) this.current = null
+    this.queue.push(plane)
+  }
+
   /** Called each frame by the sequencing step: clear finished plane, commit next */
-  sequence(): void {
+  sequence(shiftTime = 0): void {
     if (this.current?.clearOfRunway) {
       this.current = null
     }
     this.queue = this.queue.filter((p) => p.state !== 'diverted')
+    if (shiftTime < this.closedUntil) return // closed: no new commits
     while (this.current === null && this.queue.length > 0) {
       const head = this.queue[0]
       if (head.isAirborneControllable) {

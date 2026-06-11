@@ -1,13 +1,14 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { getState, startLoop, stopLoop } from '../game/loop'
 import { gameStore } from '../game/state'
+import { EventDialog } from './EventDialog'
 import { Menu } from './Menu'
 import { ScoreScreen } from './ScoreScreen'
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   useSyncExternalStore(gameStore.subscribe, gameStore.getSnapshot)
-  const { phase } = getState()
+  const { phase, pendingEvent } = getState()
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -21,6 +22,7 @@ export default function App() {
       <canvas ref={canvasRef} style={{ touchAction: 'none' }} />
       {phase === 'pre_shift' && <Menu />}
       {phase === 'post_shift' && <ScoreScreen />}
+      {phase === 'active' && pendingEvent && <EventDialog />}
     </div>
   )
 }

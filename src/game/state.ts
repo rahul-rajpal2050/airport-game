@@ -1,6 +1,7 @@
-import type { FrameEvent, Plane } from './entities/plane'
+import type { FrameEvent, Plane, PlaneKind } from './entities/plane'
 import type { Gate } from './entities/gate'
 import type { Runway } from './entities/runway'
+import type { ActiveEffect, PendingEvent, ScheduledEvent } from './systems/events'
 import type { SpawnEntry } from './systems/spawn'
 
 export type ShiftPhase = 'pre_shift' | 'active' | 'post_shift'
@@ -46,6 +47,22 @@ export interface GameState {
   shakeIntensity: number
   /** last near-miss shiftTime per plane pair, for the cooldown */
   nearMissPairs: Map<string, number>
+  /** pre-rolled event schedule (seeded) and fire cursor */
+  eventSchedule: ScheduledEvent[]
+  eventIndex: number
+  /** open event dialog, if any; deep slow-mo while set */
+  pendingEvent: PendingEvent | null
+  /** timed effect modifiers from event choices */
+  activeEffects: ActiveEffect[]
+  /** pre-rolled floats consumed by go-around checks (determinism) */
+  riskRolls: number[]
+  riskIndex: number
+  /** next spawn gets this kind (vip marking) */
+  nextSpawnKind: PlaneKind | null
+  /** red carpet chosen before the VIP spawned: it queue-jumps on arrival */
+  vipPriority: boolean
+  /** next landing's rollout duration multiplier (bird strike) */
+  nextRolloutMult: number
 }
 
 export function newGameState(seed: number | string): GameState {
@@ -69,6 +86,15 @@ export function newGameState(seed: number | string): GameState {
     shakeDurationMs: 0,
     shakeIntensity: 0,
     nearMissPairs: new Map(),
+    eventSchedule: [],
+    eventIndex: 0,
+    pendingEvent: null,
+    activeEffects: [],
+    riskRolls: [],
+    riskIndex: 0,
+    nextSpawnKind: null,
+    vipPriority: false,
+    nextRolloutMult: 1,
   }
 }
 

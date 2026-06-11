@@ -24,6 +24,7 @@ const COLORS = {
   hud: '#94a3b8',
   hudBright: '#e2e8f0',
   streak: '#4ade80',
+  vip: '#60a5fa',
   slowMoTint: 'rgba(96, 165, 250, 0.07)',
   fuelBar: '#facc15',
   patienceBar: '#fb923c',
@@ -46,7 +47,7 @@ export function draw(ctx: CanvasRenderingContext2D, state: GameState): void {
 
   drawHoldingRings(ctx, state)
   drawTerminal(ctx, state.gates)
-  for (const runway of state.runways) drawRunway(ctx, runway)
+  for (const runway of state.runways) drawRunway(ctx, runway, state.shiftTime)
   drawAssignmentLines(ctx, state)
   for (const plane of state.planes) drawPlane(ctx, plane, plane.id === state.selectedPlaneId, state.shiftTime)
   drawHud(ctx, state)
@@ -105,8 +106,9 @@ function drawHoldingRings(ctx: CanvasRenderingContext2D, state: GameState): void
   }
 }
 
-function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway): void {
+function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, shiftTime: number): void {
   const { lengthPixels, widthPixels } = CONFIG.runway
+  const closed = shiftTime < runway.closedUntil
   ctx.save()
   ctx.translate(runway.x, runway.y)
   ctx.rotate(runway.angle * DEG)
@@ -128,8 +130,21 @@ function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway): void {
   ctx.fillStyle = COLORS.runwayStripe
   ctx.fillRect(-lengthPixels / 2, -widthPixels / 2, 4, widthPixels)
 
-  // occupied indicator
-  if (!runway.free) {
+  if (closed) {
+    // diagonal hatching + label
+    ctx.strokeStyle = COLORS.planeCritical
+    ctx.lineWidth = 2
+    for (let x = -lengthPixels / 2; x < lengthPixels / 2; x += 14) {
+      ctx.beginPath()
+      ctx.moveTo(x, -widthPixels / 2)
+      ctx.lineTo(x + 8, widthPixels / 2)
+      ctx.stroke()
+    }
+    ctx.fillStyle = COLORS.planeCritical
+    ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
+    ctx.textAlign = 'center'
+    ctx.fillText('CLOSED', 0, -widthPixels / 2 - 6)
+  } else if (!runway.free) {
     ctx.strokeStyle = COLORS.planeCritical
     ctx.lineWidth = 1.5
     ctx.strokeRect(-lengthPixels / 2 - 3, -widthPixels / 2 - 3, lengthPixels + 6, widthPixels + 6)
@@ -168,7 +183,12 @@ function drawAssignmentLines(ctx: CanvasRenderingContext2D, state: GameState): v
   }
 }
 
-function planeColor(plane: Plane): string {
+function planeColor(plane: Plane, shiftTime: number): string {
+  if (plane.kind === 'medical') {
+    // urgent pulse between critical red and white
+    return Math.sin(shiftTime * 10) > 0 ? COLORS.planeCritical : COLORS.plane
+  }
+  if (plane.kind === 'vip') return COLORS.vip
   if (plane.fuel <= CONFIG.ui.fuelWarningThreshold / 2) return COLORS.planeCritical
   if (plane.fuel <= CONFIG.ui.fuelWarningThreshold) return COLORS.planeWarning
   return COLORS.plane
@@ -198,7 +218,7 @@ function drawPlane(ctx: CanvasRenderingContext2D, plane: Plane, selected: boolea
   }
 
   ctx.rotate(plane.heading)
-  ctx.fillStyle = planeColor(plane)
+  ctx.fillStyle = planeColor(plane, shiftTime)
   ctx.fillRect(-w / 2, -h / 2, w, h)
   // nose marker so heading is readable
   ctx.fillStyle = COLORS.bg

@@ -5,6 +5,7 @@ import { draw } from './render'
 import { applyJuice } from './juice/juice'
 import { simulate } from './sim'
 import { gameStore, newGameState, type GameState } from './state'
+import { generateEventSchedule, resolveEvent, rollRiskLottery } from './systems/events'
 import { generateSchedule, resetPlaneIds } from './systems/spawn'
 import { Gate } from './entities/gate'
 import { Runway } from './entities/runway'
@@ -31,7 +32,10 @@ export function startShift(seed: number | string): void {
     .slice(0, CONFIG.runway.count)
     .map((p, i) => new Runway(i, p.x, p.y, p.angle))
   state.gates = Array.from({ length: CONFIG.gate.count }, (_, i) => new Gate(i))
+  // fixed RNG draw order — the determinism contract: spawns, then events, then lottery
   state.schedule = generateSchedule(rng)
+  state.eventSchedule = generateEventSchedule(rng)
+  state.riskRolls = rollRiskLottery(rng)
   state.phase = 'active'
   gameStore.notify()
 }
@@ -46,13 +50,24 @@ function endShift(): void {
 function update(dt: number): void {
   if (state.shakeMs > 0) state.shakeMs = Math.max(0, state.shakeMs - dt * 1000)
   if (state.phase !== 'active') return
+
+  const prevPending = state.pendingEvent
   let scale = state.timeScale
   if (state.slowMoMs > 0) {
     state.slowMoMs = Math.max(0, state.slowMoMs - dt * 1000) // wall-clock countdown
     scale *= CONFIG.nearMiss.slowMoFactor
   }
+  if (state.pendingEvent) {
+    scale *= CONFIG.events.eventSlowMoFactor
+    state.pendingEvent.autoResolveMsLeft -= dt * 1000 // wall-clock decision pressure
+    if (state.pendingEvent.autoResolveMsLeft <= 0) resolveEvent(state, 0)
+  }
+
   if (simulate(state, dt * scale)) endShift()
   applyJuice(state)
+
+  // dialog opened, closed, or swapped this frame -> single React render
+  if (state.pendingEvent !== prevPending) gameStore.notify()
 }
 
 function resize(): void {

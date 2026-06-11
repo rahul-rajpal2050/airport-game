@@ -115,6 +115,12 @@ const x = rng.next() * 100;
 
 Seed is set once at shift start from either the daily seed (ISO date string) or a random session seed (which is then stored so bugs are reproducible). When reporting a bug, always include the seed.
 
+**Fixed draw order at shift start**: spawn schedule, then event schedule, then the
+risk lottery (`rollRiskLottery`). Mid-shift code never calls `rng` directly —
+probabilistic mechanics (go-arounds) consume the pre-rolled lottery via
+`consumeRiskRoll`, so the same seed plus the same player inputs always reproduce
+the identical shift.
+
 ---
 
 ## Entity State Machines

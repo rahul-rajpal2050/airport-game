@@ -37,6 +37,14 @@ export function applyJuice(state: GameState): void {
       case 'boarding_ready':
         playChime()
         break
+      case 'event_fired':
+        playAlarm()
+        shake(state, J.rageShakeIntensity, J.rageShakeMs)
+        break
+      case 'go_around':
+        playWhoosh()
+        shake(state, J.nearMissShakeIntensity, J.nearMissShakeMs)
+        break
     }
   }
   state.juiceEvents = []

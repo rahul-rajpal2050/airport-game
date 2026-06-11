@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import { CONFIG } from '../../config'
 import { Gate } from './gate'
-import { Plane, type UpdateContext } from './plane'
+import { neutralContext, Plane, type UpdateContext } from './plane'
 import { Runway } from './runway'
 
 function makeCtx(shiftTime = 0): UpdateContext {
-  return { events: [], shiftTime, occupiedRings: new Set() }
+  return neutralContext(shiftTime)
 }
 
 function makePlane(fuel = CONFIG.plane.initialFuel, id = 1): Plane {
@@ -125,6 +125,48 @@ describe('Plane state machine', () => {
     const rageEvents = ctx.events.filter((e) => e.type === 'raged')
     expect(rageEvents).toHaveLength(1)
     expect(plane.patience).toBe(0)
+  })
+
+  it('go-around: aborts at the threshold, frees the runway, rejoins the back of the queue', () => {
+    const runway = new Runway(0, 130, 560, -20)
+    const plane = makePlane()
+    const ctx = makeCtx()
+    ctx.goAround = () => true // risk active, roll fails
+
+    plane.transition('holding')
+    plane.ringIndex = 0
+    runway.enqueue(plane)
+    runway.sequence()
+    expect(plane.state).toBe('landing')
+    expect(runway.current).toBe(plane)
+
+    runUntil(plane, ctx, () => plane.state !== 'landing')
+
+    expect(plane.state).toBe('approaching')
+    expect(runway.current).toBeNull()
+    expect(runway.queue[runway.queue.length - 1]).toBe(plane) // back of the line
+    expect(ctx.events.some((e) => e.type === 'go_around')).toBe(true)
+  })
+
+  it('rollout multiplier doubles runway occupancy (bird strike)', () => {
+    const runway = new Runway(0, 130, 560, -20)
+    const plane = makePlane()
+    const ctx = makeCtx()
+    ctx.consumeRolloutMult = () => 2
+
+    plane.transition('holding')
+    plane.ringIndex = 0
+    runway.enqueue(plane)
+    runway.sequence()
+    const { threshold } = runway.geometry()
+    plane.x = threshold.x
+    plane.y = threshold.y
+    plane.update(0.001, ctx) // touch down -> rolling with mult 2
+
+    plane.update(CONFIG.runway.occupancySeconds, ctx) // normal duration: not done yet
+    expect(plane.rolloutDone).toBe(false)
+    plane.update(CONFIG.runway.occupancySeconds, ctx) // double duration reached
+    expect(plane.rolloutDone).toBe(true)
   })
 
   it('patience pauses during turnaround at the gate', () => {

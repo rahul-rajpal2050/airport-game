@@ -5,6 +5,7 @@ import { Gate } from './entities/gate'
 import { Runway } from './entities/runway'
 import { simulate } from './sim'
 import { newGameState, type GameState } from './state'
+import { generateEventSchedule, resolveEvent, rollRiskLottery } from './systems/events'
 import { generateSchedule } from './systems/spawn'
 
 function makeShiftState(seed: number | string): GameState {
@@ -14,7 +15,10 @@ function makeShiftState(seed: number | string): GameState {
     .slice(0, CONFIG.runway.count)
     .map((p, i) => new Runway(i, p.x, p.y, p.angle))
   state.gates = Array.from({ length: CONFIG.gate.count }, (_, i) => new Gate(i))
-  state.schedule = generateSchedule(new RNG(seed))
+  const rng = new RNG(seed)
+  state.schedule = generateSchedule(rng)
+  state.eventSchedule = generateEventSchedule(rng)
+  state.riskRolls = rollRiskLottery(rng)
   return state
 }
 
@@ -29,6 +33,8 @@ function runFullShift(seed: number | string, assign: boolean): GameState {
   let nextRunway = 0
   let ended = false
   while (!ended) {
+    // scripted event choice: always option B (same input sequence both runs)
+    if (state.pendingEvent) resolveEvent(state, 1)
     if (assign) {
       for (const plane of state.planes) {
         if (plane.isAirborneControllable && !plane.assignedRunway) {

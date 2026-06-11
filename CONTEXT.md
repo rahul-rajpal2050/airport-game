@@ -30,7 +30,9 @@ src/
     systems/
       spawn.ts      -- Pre-rolled spawn schedule (determinism contract), rateAt
       collision.ts  -- Near-miss detection (pair cooldown, holding-pairs excluded)
-      scoring.ts    -- Frame-event consumption -> score + stats + streak
+      events.ts     -- Event engine: pre-rolled schedule, effect-primitive
+                       interpreter, dialog lifecycle, risk lottery
+      scoring.ts    -- Frame-event consumption -> score + stats + streak + kind mults
     juice/
       audio.ts      -- Synthesized Web Audio (thunk, whoosh, alarm, chime...)
       juice.ts      -- Loop-side event consumer: sounds + screen shake
@@ -79,6 +81,10 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
 
 ## Recent Changes
+[2026-06-11] Phase 3 complete: data-driven events system. Effect-primitive
+interpreter; 4 launch events (medical, fog, bird strike, VIP); EventDialog with
+8s auto-resolve under deep slow-mo; go-arounds via pre-rolled risk lottery;
+closed-runway mechanics. 46 tests passing.
 [2026-06-11] Phase 2 complete: gate pipeline (the cascade), near-miss/slow-mo/streak,
 juice (synthesized audio, screen shake). 32 tests passing.
 [2026-06-10] Density retune after feel feedback: spawnCurve 5->12/min, occupancy 8s.
@@ -95,8 +101,13 @@ Dev console handle window.__game (DEV only) for feel-tuning.
   buzz); screen shake on failures
 - Perfect-play benchmark (auto-controller, seed 'integration-seed'): 33 landed,
   21 departed, 18 on-time, score 5920 — late shift saturates by design
-- Tests: 32 across 5 files; same-seed determinism verified end-to-end
+- Events live: seeded schedule picks 2 of 4 events per shift; choices are real
+  trade-offs applied through effect primitives (close_runway, patience/fuel mults,
+  go_around_risk, mark_plane, queue_jump, next_rollout_mult, score_delta).
+  Adding event #5 = one def in CONFIG.events.defs
+- Tests: 46 across 6 files; determinism contract holds with events + risk lottery
+  (same seed + same scripted choices = identical stats)
 - Git: clean history, one commit per feature
-- Next: Phase 3 data-driven events (medical, fog, bird strike, VIP)
+- Next: Phase 4 roguelite meta (reputation currency, perk draft, localStorage)
 - Deferred known issue: 10+ plane holding stacks orbit partially off-screen
   (outer ring radius exceeds canvas width)

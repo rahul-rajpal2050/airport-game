@@ -81,6 +81,17 @@ export function updateSpawns(state: GameState): void {
   ) {
     const e = state.schedule[state.scheduleIndex++]
     const plane = new Plane(nextPlaneId++, e.callsign, e.x, e.y, e.fuel, e.time)
+    if (state.nextSpawnKind !== null) {
+      plane.kind = state.nextSpawnKind
+      state.nextSpawnKind = null
+      if (plane.kind === 'vip' && state.vipPriority) {
+        // red carpet: straight to the front of the emptier runway's queue
+        const emptier = state.runways.reduce((a, b) => (a.queue.length <= b.queue.length ? a : b))
+        plane.assignedRunway = emptier
+        emptier.queue.unshift(plane)
+        state.vipPriority = false
+      }
+    }
     state.planes.push(plane)
     state.events.push({ type: 'spawned', plane })
   }
