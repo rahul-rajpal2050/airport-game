@@ -25,17 +25,36 @@ export interface ActiveEffect {
 /**
  * Pre-rolls which events fire this shift and when, from the seeded RNG.
  * Draw order is fixed (after the spawn schedule) — the determinism contract.
+ * Forced events (shift archetypes) are guaranteed; the rest are random distinct picks.
  */
-export function generateEventSchedule(rng: RNG): ScheduledEvent[] {
+export function generateEventSchedule(
+  rng: RNG,
+  options?: { count?: number; forced?: string[] }
+): ScheduledEvent[] {
+  const count = Math.min(options?.count ?? CONFIG.events.maxPerShift, CONFIG.events.defs.length)
   const defs = [...CONFIG.events.defs]
   const picked: ScheduledEvent[] = []
-  const count = Math.min(CONFIG.events.maxPerShift, defs.length)
-  for (let i = 0; i < count; i++) {
-    const idx = rng.int(0, defs.length - 1)
+
+  for (const forcedId of options?.forced ?? []) {
+    const idx = defs.findIndex((d) => d.id === forcedId)
+    if (idx === -1) continue
     const def = defs.splice(idx, 1)[0]
     picked.push({ defId: def.id, time: rng.float(def.windowSeconds[0], def.windowSeconds[1]) })
   }
+  while (picked.length < count && defs.length > 0) {
+    const def = defs.splice(rng.int(0, defs.length - 1), 1)[0]
+    picked.push({ defId: def.id, time: rng.float(def.windowSeconds[0], def.windowSeconds[1]) })
+  }
   return picked.sort((a, b) => a.time - b.time)
+}
+
+/** Next scheduled-but-unfired event, for the Weather Radar HUD warning */
+export function upcomingEvent(state: GameState): { def: GameEventDef; inSeconds: number } | null {
+  if (state.eventIndex >= state.eventSchedule.length) return null
+  const next = state.eventSchedule[state.eventIndex]
+  const def = CONFIG.events.defs.find((d) => d.id === next.defId)
+  if (!def) return null
+  return { def, inSeconds: next.time - state.shiftTime }
 }
 
 export function rollRiskLottery(rng: RNG): number[] {

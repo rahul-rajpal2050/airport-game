@@ -35,8 +35,9 @@ export function simulate(state: GameState, dt: number): boolean {
     events: state.events,
     shiftTime: state.shiftTime,
     occupiedRings,
-    patienceMult: patienceMultiplier(state),
-    fuelMult: fuelMultiplier(state),
+    patienceMult: patienceMultiplier(state) * state.modifiers.patienceDrainMult,
+    fuelMult: fuelMultiplier(state) * state.modifiers.fuelDrainMult,
+    turnaroundMult: state.modifiers.turnaroundMult,
     goAround: (runwayId) => {
       const p = goAroundProbability(state, runwayId)
       return p > 0 && consumeRiskRoll(state) < p

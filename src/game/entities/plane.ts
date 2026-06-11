@@ -40,9 +40,10 @@ export interface UpdateContext {
   shiftTime: number
   /** ring indices currently occupied by holding planes, for slot assignment */
   occupiedRings: Set<number>
-  /** global event-effect multipliers (1 when no event is active) */
+  /** combined event x perk multipliers (1 when nothing is active) */
   patienceMult: number
   fuelMult: number
+  turnaroundMult: number
   /** true = this landing must go around (risk roll already consumed) */
   goAround: (runwayId: number) => boolean
   /** rollout duration multiplier for a plane entering the runway (bird strike) */
@@ -56,6 +57,7 @@ export function neutralContext(shiftTime = 0): UpdateContext {
     occupiedRings: new Set(),
     patienceMult: 1,
     fuelMult: 1,
+    turnaroundMult: 1,
     goAround: () => false,
     consumeRolloutMult: () => 1,
   }
@@ -187,7 +189,7 @@ export class Plane {
         break
       case 'at_gate':
         this.gateTimer += dt
-        if (this.gateTimer >= CONFIG.gate.turnaroundSeconds) {
+        if (this.gateTimer >= CONFIG.gate.turnaroundSeconds * ctx.turnaroundMult) {
           this.transition('boarding')
           ctx.events.push({ type: 'boarding_ready', plane: this })
         }

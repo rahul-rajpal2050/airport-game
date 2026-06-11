@@ -1,3 +1,4 @@
+import { identityModifiers, type Modifiers } from '../config'
 import type { FrameEvent, Plane, PlaneKind } from './entities/plane'
 import type { Gate } from './entities/gate'
 import type { Runway } from './entities/runway'
@@ -63,6 +64,10 @@ export interface GameState {
   vipPriority: boolean
   /** next landing's rollout duration multiplier (bird strike) */
   nextRolloutMult: number
+  /** perk modifiers for this shift (identity when no perks) */
+  modifiers: Modifiers
+  /** campaign reputation shown in the HUD, null in free-shift mode */
+  hudReputation: number | null
 }
 
 export function newGameState(seed: number | string): GameState {
@@ -95,6 +100,8 @@ export function newGameState(seed: number | string): GameState {
     nextSpawnKind: null,
     vipPriority: false,
     nextRolloutMult: 1,
+    modifiers: identityModifiers(),
+    hudReputation: null,
   }
 }
 

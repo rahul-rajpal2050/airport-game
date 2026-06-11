@@ -46,12 +46,12 @@ function rollEdgePosition(rng: RNG): { x: number; y: number } {
  * This is the determinism contract: all RNG draws happen here, before frame 1,
  * so the same seed always produces the identical shift.
  */
-export function generateSchedule(rng: RNG): SpawnEntry[] {
+export function generateSchedule(rng: RNG, rateMult = 1): SpawnEntry[] {
   const { durationSeconds, spawnCurve } = CONFIG.shift
   const entries: SpawnEntry[] = []
   let t = 0
   for (;;) {
-    const rate = rateAt(t, spawnCurve)
+    const rate = rateAt(t, spawnCurve) * rateMult
     const meanInterval = 60 / rate
     t += meanInterval * (0.5 + rng.next()) // jittered around the mean
     if (t >= durationSeconds) break

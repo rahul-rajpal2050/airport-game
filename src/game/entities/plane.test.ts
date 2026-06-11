@@ -169,6 +169,24 @@ describe('Plane state machine', () => {
     expect(plane.rolloutDone).toBe(true)
   })
 
+  it('turnaround multiplier shortens gate time (Express Taxiway perk)', () => {
+    const plane = makePlane()
+    const gate = new Gate(0)
+    const ctx = makeCtx()
+    ctx.turnaroundMult = 0.5
+    gate.reserve(plane)
+    plane.transition('holding')
+    plane.ringIndex = 0
+    plane.transition('landing')
+    plane.transition('rolling')
+    plane.rolloutDone = true
+    plane.update(0.1, ctx)
+    runUntil(plane, ctx, () => plane.state === 'at_gate')
+
+    plane.update(CONFIG.gate.turnaroundSeconds * 0.5 + 0.1, ctx)
+    expect(plane.state).toBe('boarding')
+  })
+
   it('patience pauses during turnaround at the gate', () => {
     const plane = makePlane()
     const gate = new Gate(0)

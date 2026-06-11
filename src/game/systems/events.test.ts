@@ -51,6 +51,15 @@ describe('generateEventSchedule', () => {
   it('risk lottery is identical for the same seed', () => {
     expect(rollRiskLottery(new RNG(42))).toEqual(rollRiskLottery(new RNG(42)))
   })
+
+  it('forced events always appear; count override respected', () => {
+    for (let seed = 0; seed < 10; seed++) {
+      const schedule = generateEventSchedule(new RNG(seed), { count: 2, forced: ['fog'] })
+      expect(schedule.some((s) => s.defId === 'fog')).toBe(true)
+      expect(schedule.length).toBe(2)
+    }
+    expect(generateEventSchedule(new RNG(1), { count: 3 }).length).toBe(3)
+  })
 })
 
 describe('tickEvents', () => {

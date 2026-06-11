@@ -1,4 +1,4 @@
-import { CONFIG } from '../config'
+import { CONFIG, identityModifiers, type Modifiers, type ShiftArchetype } from '../config'
 import { rng } from '../utils/rng'
 import { attachInput } from './input'
 import { draw } from './render'
@@ -24,17 +24,40 @@ export function getState(): GameState {
   return state
 }
 
-export function startShift(seed: number | string): void {
+export interface ShiftOptions {
+  modifiers?: Modifiers
+  archetype?: ShiftArchetype
+  hudReputation?: number
+}
+
+export function startShift(seed: number | string, options?: ShiftOptions): void {
   rng.reseed(seed)
   resetPlaneIds()
   state = newGameState(seed)
+  state.modifiers = options?.modifiers ?? identityModifiers()
+  state.hudReputation = options?.hudReputation ?? null
+  const archetype = options?.archetype
+
+  const runwayCount = Math.min(
+    CONFIG.runway.count + state.modifiers.extraRunways,
+    CONFIG.runway.positions.length
+  )
   state.runways = CONFIG.runway.positions
-    .slice(0, CONFIG.runway.count)
+    .slice(0, runwayCount)
     .map((p, i) => new Runway(i, p.x, p.y, p.angle))
-  state.gates = Array.from({ length: CONFIG.gate.count }, (_, i) => new Gate(i))
+  for (const closedId of archetype?.closedRunways ?? []) {
+    const runway = state.runways[closedId]
+    if (runway) runway.closedUntil = Infinity
+  }
+  const gateCount = CONFIG.gate.count + state.modifiers.extraGates
+  state.gates = Array.from({ length: gateCount }, (_, i) => new Gate(i, gateCount))
+
   // fixed RNG draw order — the determinism contract: spawns, then events, then lottery
-  state.schedule = generateSchedule(rng)
-  state.eventSchedule = generateEventSchedule(rng)
+  state.schedule = generateSchedule(rng, archetype?.spawnRateMult ?? 1)
+  state.eventSchedule = generateEventSchedule(rng, {
+    count: archetype?.eventCount,
+    forced: archetype?.forcedEvents,
+  })
   state.riskRolls = rollRiskLottery(rng)
   state.phase = 'active'
   gameStore.notify()

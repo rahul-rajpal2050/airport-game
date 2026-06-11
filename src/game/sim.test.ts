@@ -90,4 +90,34 @@ describe('full shift simulation', () => {
     expect(state.shiftTime).toBeGreaterThanOrEqual(CONFIG.shift.durationSeconds)
     expect(state.shiftTime).toBeLessThan(CONFIG.shift.durationSeconds + 1)
   })
+
+  it('fuel modifier changes outcomes: slower drain means fewer diversions when ignored', () => {
+    const base = runFullShift('modifier-seed', false)
+    const eased = (() => {
+      const state = makeShiftState('modifier-seed')
+      state.modifiers.fuelDrainMult = 0.3
+      const dt = 1 / 60
+      let ended = false
+      while (!ended) ended = simulate(state, dt)
+      return state
+    })()
+    expect(base.stats.diverted).toBeGreaterThan(0)
+    expect(eased.stats.diverted).toBeLessThan(base.stats.diverted)
+  })
+
+  it('determinism holds with modifiers active', () => {
+    const run = () => {
+      const state = makeShiftState('mod-det')
+      state.modifiers.fuelDrainMult = 0.6
+      state.modifiers.patienceDrainMult = 0.75
+      const dt = 1 / 60
+      let ended = false
+      while (!ended) {
+        if (state.pendingEvent) resolveEvent(state, 1)
+        ended = simulate(state, dt)
+      }
+      return state.stats
+    }
+    expect(run()).toEqual(run())
+  })
 })

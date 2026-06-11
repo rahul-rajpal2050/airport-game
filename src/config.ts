@@ -27,6 +27,48 @@ export interface GameEventDef {
   options: [EventOptionDef, EventOptionDef]
 }
 
+// Perk modifiers applied at shift start. Identity values = no perk.
+export interface Modifiers {
+  turnaroundMult: number
+  fuelDrainMult: number
+  patienceDrainMult: number
+  extraRunways: number
+  extraGates: number
+  eventWarningSeconds: number
+}
+
+export function identityModifiers(): Modifiers {
+  return {
+    turnaroundMult: 1,
+    fuelDrainMult: 1,
+    patienceDrainMult: 1,
+    extraRunways: 0,
+    extraGates: 0,
+    eventWarningSeconds: 0,
+  }
+}
+
+export interface PerkDef {
+  id: string
+  name: string
+  description: string
+  repCost: number
+  modifiers: Partial<Modifiers>
+}
+
+export interface ShiftArchetype {
+  id: string
+  name: string
+  description: string
+  spawnRateMult: number
+  eventCount: number
+  forcedEvents?: string[]
+  /** runway indices closed for the entire shift */
+  closedRunways?: number[]
+  /** reputation deltas scaled by this (VIP Day) */
+  repDeltaMult?: number
+}
+
 export const CONFIG = {
   canvas: {
     // Logical resolution — scaled to fill the viewport. Landscape, laptop-first.
@@ -200,6 +242,99 @@ export const CONFIG = {
         ],
       },
     ] as GameEventDef[],
+  },
+
+  perks: {
+    draftSize: 3,
+    defs: [
+      {
+        id: 'third_runway',
+        name: 'Third Runway',
+        description: 'Open runway 3. Throughput up, coordination load up.',
+        repCost: 20,
+        modifiers: { extraRunways: 1 },
+      },
+      {
+        id: 'express_taxiway',
+        name: 'Express Taxiway',
+        description: 'Gate turnaround 30% faster.',
+        repCost: 12,
+        modifiers: { turnaroundMult: 0.7 },
+      },
+      {
+        id: 'long_range_tanks',
+        name: 'Long-Range Tanks',
+        description: 'Holding planes burn fuel 40% slower.',
+        repCost: 12,
+        modifiers: { fuelDrainMult: 0.6 },
+      },
+      {
+        id: 'weather_radar',
+        name: 'Weather Radar',
+        description: 'See the next event coming 60 seconds early.',
+        repCost: 8,
+        modifiers: { eventWarningSeconds: 60 },
+      },
+      {
+        id: 'calm_cabins',
+        name: 'Calm Cabins',
+        description: 'Passenger patience drains 25% slower.',
+        repCost: 10,
+        modifiers: { patienceDrainMult: 0.75 },
+      },
+      {
+        id: 'seventh_gate',
+        name: 'Seventh Gate',
+        description: 'One more gate at the terminal.',
+        repCost: 10,
+        modifiers: { extraGates: 1 },
+      },
+    ] as PerkDef[],
+  },
+
+  campaign: {
+    shiftsPerRun: 5,
+    archetypes: [
+      {
+        id: 'morning_rush',
+        name: 'Morning Rush',
+        description: 'A gentle start. Learn the field.',
+        spawnRateMult: 0.85,
+        eventCount: 1,
+      },
+      {
+        id: 'storm_front',
+        name: 'Storm Front',
+        description: 'Weather is rolling in. Guaranteed fog.',
+        spawnRateMult: 1,
+        eventCount: 2,
+        forcedEvents: ['fog'],
+      },
+      {
+        id: 'vip_day',
+        name: 'VIP Day',
+        description: 'Government traffic. Reputation swings hit twice as hard.',
+        spawnRateMult: 1,
+        eventCount: 2,
+        forcedEvents: ['vip'],
+        repDeltaMult: 2,
+      },
+      {
+        id: 'understaffed',
+        name: 'Understaffed',
+        description: 'Runway 2 crew called in sick. One strip all shift.',
+        spawnRateMult: 0.8,
+        eventCount: 2,
+        closedRunways: [1],
+      },
+      {
+        id: 'chaos',
+        name: 'Chaos',
+        description: 'Everything at once. Survive it.',
+        spawnRateMult: 1.15,
+        eventCount: 3,
+      },
+    ] as ShiftArchetype[],
   },
 
   juice: {

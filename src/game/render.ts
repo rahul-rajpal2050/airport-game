@@ -3,6 +3,7 @@ import type { Gate } from './entities/gate'
 import type { Plane } from './entities/plane'
 import type { Runway } from './entities/runway'
 import type { GameState } from './state'
+import { upcomingEvent } from './systems/events'
 
 const DEG = Math.PI / 180
 
@@ -284,5 +285,23 @@ function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
     ctx.fillStyle = COLORS.streak
     ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
     ctx.fillText(`near-miss x${state.streak}`, width / 2, pad + 32)
+  }
+
+  if (state.hudReputation !== null) {
+    ctx.fillStyle = COLORS.hud
+    ctx.font = `${CONFIG.ui.hudFontSize}px monospace`
+    ctx.textAlign = 'left'
+    ctx.fillText(`REP ${state.hudReputation}`, pad, pad + 34)
+  }
+
+  // Weather Radar perk: announce the next event before it fires
+  if (state.modifiers.eventWarningSeconds > 0 && !state.pendingEvent) {
+    const next = upcomingEvent(state)
+    if (next && next.inSeconds > 0 && next.inSeconds <= state.modifiers.eventWarningSeconds) {
+      ctx.fillStyle = COLORS.planeWarning
+      ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
+      ctx.textAlign = 'center'
+      ctx.fillText(`RADAR: ${next.def.name} in ${Math.ceil(next.inSeconds)}s`, width / 2, pad + 48)
+    }
   }
 }
