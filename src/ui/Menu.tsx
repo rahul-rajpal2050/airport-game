@@ -1,3 +1,4 @@
+import { initAudio } from '../game/juice/audio'
 import { startShift } from '../game/loop'
 import { randomSessionSeed } from '../utils/rng'
 import { buttonStyle, overlayStyle } from './overlay'
@@ -9,7 +10,13 @@ export function Menu() {
       <p style={{ color: '#94a3b8', maxWidth: 280, lineHeight: 1.5 }}>
         Tap a plane, then tap a runway. Land everyone before they run out of fuel.
       </p>
-      <button style={buttonStyle} onClick={() => startShift(randomSessionSeed())}>
+      <button
+        style={buttonStyle}
+        onClick={() => {
+          initAudio()
+          startShift(randomSessionSeed())
+        }}
+      >
         START SHIFT
       </button>
     </div>

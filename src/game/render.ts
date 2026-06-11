@@ -37,12 +37,20 @@ export function draw(ctx: CanvasRenderingContext2D, state: GameState): void {
 
   if (state.phase === 'pre_shift') return // React menu covers the canvas
 
+  // screen shake: deterministic high-frequency wobble, decaying with remaining time
+  ctx.save()
+  if (state.shakeMs > 0 && state.shakeDurationMs > 0) {
+    const amp = state.shakeIntensity * (state.shakeMs / state.shakeDurationMs)
+    ctx.translate(Math.sin(state.shiftTime * 53) * amp, Math.cos(state.shiftTime * 47) * amp)
+  }
+
   drawHoldingRings(ctx, state)
   drawTerminal(ctx, state.gates)
   for (const runway of state.runways) drawRunway(ctx, runway)
   drawAssignmentLines(ctx, state)
   for (const plane of state.planes) drawPlane(ctx, plane, plane.id === state.selectedPlaneId, state.shiftTime)
   drawHud(ctx, state)
+  ctx.restore()
 
   if (state.slowMoMs > 0) {
     ctx.fillStyle = COLORS.slowMoTint

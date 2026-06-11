@@ -76,8 +76,16 @@ export const CONFIG = {
     cooldownSeconds: 5,        // min gap between near-misses for the same pair
     slowMoFactor: 0.2,         // time scale during slow-mo
     slowMoDurationMs: 1200,
-    screenShakeIntensity: 6,
-    screenShakeDurationMs: 400,
+  },
+
+  juice: {
+    masterVolume: 0.25,
+    nearMissShakeIntensity: 3,
+    nearMissShakeMs: 250,
+    divertShakeIntensity: 8,
+    divertShakeMs: 500,
+    rageShakeIntensity: 5,
+    rageShakeMs: 400,
   },
 
   scoring: {

@@ -32,14 +32,44 @@ export interface GameState {
   schedule: SpawnEntry[]
   scheduleIndex: number
   events: FrameEvent[]
+  /** last tick's events, handed to the juice layer (sound/shake) by the loop */
+  juiceEvents: FrameEvent[]
   stats: ShiftStats
   selectedPlaneId: number | null
   /** consecutive near-misses without a failure; resets on diverted/raged */
   streak: number
   /** remaining slow-motion time (wall-clock ms); loop applies slowMoFactor while > 0 */
   slowMoMs: number
+  /** screen shake state (wall-clock ms); render reads, loop ticks down */
+  shakeMs: number
+  shakeDurationMs: number
+  shakeIntensity: number
   /** last near-miss shiftTime per plane pair, for the cooldown */
   nearMissPairs: Map<string, number>
+}
+
+export function newGameState(seed: number | string): GameState {
+  return {
+    phase: 'pre_shift',
+    seed,
+    shiftTime: 0,
+    timeScale: 1,
+    planes: [],
+    runways: [],
+    gates: [],
+    schedule: [],
+    scheduleIndex: 0,
+    events: [],
+    juiceEvents: [],
+    stats: newStats(),
+    selectedPlaneId: null,
+    streak: 0,
+    slowMoMs: 0,
+    shakeMs: 0,
+    shakeDurationMs: 0,
+    shakeIntensity: 0,
+    nearMissPairs: new Map(),
+  }
 }
 
 export function newStats(): ShiftStats {

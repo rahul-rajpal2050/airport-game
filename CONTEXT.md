@@ -24,11 +24,16 @@ src/
     input.ts        -- Pointer -> logical coords, tap-tap assignment
     render.ts       -- All canvas drawing
     entities/
-      plane.ts      -- Plane class, full state machine, per-state movement
-      runway.ts     -- Runway class: queue, reserve, sequence(), hit-test
+      plane.ts      -- Plane class, full lifecycle state machine, per-state movement
+      runway.ts     -- Runway class: mixed arrival/departure FIFO, hold-short, hit-test
+      gate.ts       -- Gate class: reserve/occupy/release, terminal layout
     systems/
       spawn.ts      -- Pre-rolled spawn schedule (determinism contract), rateAt
-      scoring.ts    -- Frame-event consumption -> score + stats
+      collision.ts  -- Near-miss detection (pair cooldown, holding-pairs excluded)
+      scoring.ts    -- Frame-event consumption -> score + stats + streak
+    juice/
+      audio.ts      -- Synthesized Web Audio (thunk, whoosh, alarm, chime...)
+      juice.ts      -- Loop-side event consumer: sounds + screen shake
   utils/
     rng.ts          -- Seeded RNG (Mulberry32; never Math.random())
   ui/
@@ -74,22 +79,24 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
 
 ## Recent Changes
-[2026-06-10] Density retune after feel feedback: spawnCurve 5->12/min (was 2->8),
-occupancy 12s->8s, tighter holding rings, faster orbit. ~44-54 planes/shift, first
-contact <14s. Added dev console handle window.__game (DEV only) for feel-tuning.
-[2026-06-10] Phase 1 complete: core loop playable — spawn, tap-tap assign, hold/orbit,
-land, score screen with stats and replay. 22 tests passing (bun test).
-[2026-06-10] Phase 0: Vite + TS scaffold, seeded RNG, config.ts, canvas loop shell
-[2026-06-10] Created GDD.md, CLAUDE.md, CONTEXT.md — project setup
+[2026-06-11] Phase 2 complete: gate pipeline (the cascade), near-miss/slow-mo/streak,
+juice (synthesized audio, screen shake). 32 tests passing.
+[2026-06-10] Density retune after feel feedback: spawnCurve 5->12/min, occupancy 8s.
+Dev console handle window.__game (DEV only) for feel-tuning.
+[2026-06-10] Phase 1: core loop playable. Phase 0: scaffold, seeded RNG, config.
 
 ## Current State
-- Phase 1 playable: planes spawn on pre-rolled schedule, fly to holding rings, orbit
-  burning fuel/patience; tap plane -> tap runway enqueues; runways auto-sequence;
-  landing rolls out over occupancySeconds; fuel exhaustion diverts (penalty);
-  score screen shows landed/diverted/longest-hold stat + seed + Play Again
-- Tests: 22 across spawn determinism, plane state machine, runway sequencing,
-  scoring math, and full-shift headless integration (sim.ts)
-- NOT YET a git repository — needs git init + initial commit
-- Next: kill checkpoint (play 10 shifts, tune config.ts feel), then Phase 2 cascades
-- Known tuning question: first plane arrives ~15-45s in (rate 2/min at t=0) — may feel
-  slow; bump spawnCurve[0] if the opening drags
+- Phase 2 playable: full lifecycle approach -> hold -> land -> roll -> taxi -> gate
+  turnaround -> boarding -> taxi out -> hold short -> takeoff -> climb out.
+  Gateless planes BLOCK their runway after rollout (flashing ring) — the cascade.
+  Mixed FIFO runway queues; gates reserve from the air; patience rage (one-time
+  penalty); departures pay big scaled by delay vs deadline; near-miss slow-mo +
+  streak bonus; synthesized sounds (landing thunk, whoosh, alarm, chime, takeoff,
+  buzz); screen shake on failures
+- Perfect-play benchmark (auto-controller, seed 'integration-seed'): 33 landed,
+  21 departed, 18 on-time, score 5920 — late shift saturates by design
+- Tests: 32 across 5 files; same-seed determinism verified end-to-end
+- Git: clean history, one commit per feature
+- Next: Phase 3 data-driven events (medical, fog, bird strike, VIP)
+- Deferred known issue: 10+ plane holding stacks orbit partially off-screen
+  (outer ring radius exceeds canvas width)

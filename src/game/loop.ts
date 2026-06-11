@@ -2,8 +2,9 @@ import { CONFIG } from '../config'
 import { rng } from '../utils/rng'
 import { attachInput } from './input'
 import { draw } from './render'
+import { applyJuice } from './juice/juice'
 import { simulate } from './sim'
-import { gameStore, newStats, type GameState } from './state'
+import { gameStore, newGameState, type GameState } from './state'
 import { generateSchedule, resetPlaneIds } from './systems/spawn'
 import { Gate } from './entities/gate'
 import { Runway } from './entities/runway'
@@ -16,27 +17,7 @@ let canvas: HTMLCanvasElement
 let ctx: CanvasRenderingContext2D
 let detachInput: (() => void) | null = null
 
-let state: GameState = makeIdleState()
-
-function makeIdleState(): GameState {
-  return {
-    phase: 'pre_shift',
-    seed: rng.seed,
-    shiftTime: 0,
-    timeScale: 1,
-    planes: [],
-    runways: [],
-    gates: [],
-    schedule: [],
-    scheduleIndex: 0,
-    events: [],
-    stats: newStats(),
-    selectedPlaneId: null,
-    streak: 0,
-    slowMoMs: 0,
-    nearMissPairs: new Map(),
-  }
-}
+let state: GameState = newGameState(rng.seed)
 
 export function getState(): GameState {
   return state
@@ -45,8 +26,7 @@ export function getState(): GameState {
 export function startShift(seed: number | string): void {
   rng.reseed(seed)
   resetPlaneIds()
-  state = makeIdleState()
-  state.seed = seed
+  state = newGameState(seed)
   state.runways = CONFIG.runway.positions
     .slice(0, CONFIG.runway.count)
     .map((p, i) => new Runway(i, p.x, p.y, p.angle))
@@ -64,6 +44,7 @@ function endShift(): void {
 }
 
 function update(dt: number): void {
+  if (state.shakeMs > 0) state.shakeMs = Math.max(0, state.shakeMs - dt * 1000)
   if (state.phase !== 'active') return
   let scale = state.timeScale
   if (state.slowMoMs > 0) {
@@ -71,6 +52,7 @@ function update(dt: number): void {
     scale *= CONFIG.nearMiss.slowMoFactor
   }
   if (simulate(state, dt * scale)) endShift()
+  applyJuice(state)
 }
 
 function resize(): void {

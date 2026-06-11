@@ -4,29 +4,18 @@ import { RNG } from '../utils/rng'
 import { Gate } from './entities/gate'
 import { Runway } from './entities/runway'
 import { simulate } from './sim'
-import { newStats, type GameState } from './state'
+import { newGameState, type GameState } from './state'
 import { generateSchedule } from './systems/spawn'
 
 function makeShiftState(seed: number | string): GameState {
-  return {
-    phase: 'active',
-    seed,
-    shiftTime: 0,
-    timeScale: 1,
-    planes: [],
-    runways: CONFIG.runway.positions
-      .slice(0, CONFIG.runway.count)
-      .map((p, i) => new Runway(i, p.x, p.y, p.angle)),
-    gates: Array.from({ length: CONFIG.gate.count }, (_, i) => new Gate(i)),
-    schedule: generateSchedule(new RNG(seed)),
-    scheduleIndex: 0,
-    events: [],
-    stats: newStats(),
-    selectedPlaneId: null,
-    streak: 0,
-    slowMoMs: 0,
-    nearMissPairs: new Map(),
-  }
+  const state = newGameState(seed)
+  state.phase = 'active'
+  state.runways = CONFIG.runway.positions
+    .slice(0, CONFIG.runway.count)
+    .map((p, i) => new Runway(i, p.x, p.y, p.angle))
+  state.gates = Array.from({ length: CONFIG.gate.count }, (_, i) => new Gate(i))
+  state.schedule = generateSchedule(new RNG(seed))
+  return state
 }
 
 /**

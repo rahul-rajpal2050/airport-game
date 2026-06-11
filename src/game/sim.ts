@@ -32,7 +32,11 @@ export function simulate(state: GameState, dt: number): boolean {
   // 5. scoring consumes events
   applyScoring(state)
 
-  // 6. sweep finished planes
+  // 6. hand events to the juice layer (loop-side: sound/shake), start fresh
+  state.juiceEvents = state.events
+  state.events = []
+
+  // 7. sweep finished planes
   state.planes = state.planes.filter((p) => p.state !== 'departed' && p.state !== 'diverted')
 
   return state.shiftTime >= CONFIG.shift.durationSeconds

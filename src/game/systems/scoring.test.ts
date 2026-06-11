@@ -1,27 +1,13 @@
 import { describe, expect, it } from 'bun:test'
 import { CONFIG } from '../../config'
 import { Plane } from '../entities/plane'
-import { newStats, type GameState } from '../state'
+import { newGameState, type GameState } from '../state'
 import { applyScoring } from './scoring'
 
 function makeState(): GameState {
-  return {
-    phase: 'active',
-    seed: 1,
-    shiftTime: 0,
-    timeScale: 1,
-    planes: [],
-    runways: [],
-    gates: [],
-    schedule: [],
-    scheduleIndex: 0,
-    events: [],
-    stats: newStats(),
-    selectedPlaneId: null,
-    streak: 0,
-    slowMoMs: 0,
-    nearMissPairs: new Map(),
-  }
+  const state = newGameState(1)
+  state.phase = 'active'
+  return state
 }
 
 function makePlane(): Plane {
@@ -37,7 +23,6 @@ describe('applyScoring', () => {
     applyScoring(state)
     expect(state.stats.score).toBe(S.landingBase)
     expect(state.stats.landed).toBe(1)
-    expect(state.events).toHaveLength(0)
   })
 
   it('on-time departure pays depart base plus on-time bonus', () => {

@@ -1,7 +1,7 @@
 import { CONFIG } from '../../config'
 import type { GameState } from '../state'
 
-/** Consume this frame's events into score and stats, then clear the list */
+/** Consume this frame's events into score and stats (sim hands them to juice after) */
 export function applyScoring(state: GameState): void {
   const S = CONFIG.scoring
   for (const event of state.events) {
@@ -53,5 +53,4 @@ export function applyScoring(state: GameState): void {
       state.stats.longestHoldCallsign = event.plane.callsign
     }
   }
-  state.events.length = 0
 }

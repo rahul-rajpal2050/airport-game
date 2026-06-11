@@ -1,27 +1,13 @@
 import { describe, expect, it } from 'bun:test'
 import { CONFIG } from '../../config'
 import { Plane } from '../entities/plane'
-import { newStats, type GameState } from '../state'
+import { newGameState, type GameState } from '../state'
 import { detectNearMisses } from './collision'
 
 function makeState(): GameState {
-  return {
-    phase: 'active',
-    seed: 1,
-    shiftTime: 0,
-    timeScale: 1,
-    planes: [],
-    runways: [],
-    gates: [],
-    schedule: [],
-    scheduleIndex: 0,
-    events: [],
-    stats: newStats(),
-    selectedPlaneId: null,
-    streak: 0,
-    slowMoMs: 0,
-    nearMissPairs: new Map(),
-  }
+  const state = newGameState(1)
+  state.phase = 'active'
+  return state
 }
 
 function planeAt(id: number, x: number, y: number, state: Plane['state']): Plane {

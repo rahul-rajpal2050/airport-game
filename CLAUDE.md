@@ -30,18 +30,19 @@ src/
     input.ts        -- Pointer handling, hit-testing (tap plane -> tap runway)
     render.ts       -- All canvas draw code
     entities/
-      plane.ts      -- Plane entity + state machine
-      runway.ts     -- Runway entity
-      gate.ts       -- Gate entity
+      plane.ts      -- Plane entity + full lifecycle state machine
+      runway.ts     -- Runway entity, mixed arrival/departure queue
+      gate.ts       -- Gate entity, reserve/occupy/release
     systems/
-      spawn.ts      -- Plane spawning, approach queue management
-      collision.ts  -- Near-miss detection, collision checks
-      cascade.ts    -- Delay propagation, patience drain, fuel drain
-      events.ts     -- Event system, event definitions
-      scoring.ts    -- Score calculation, reputation updates
+      spawn.ts      -- Plane spawning, pre-rolled schedule (determinism contract)
+      collision.ts  -- Near-miss detection
+      events.ts     -- Event system, event definitions (Phase 3)
+      scoring.ts    -- Score calculation, streak, stats
+    juice/
+      audio.ts      -- Synthesized Web Audio sounds (no asset files)
+      juice.ts      -- Event consumer: sound + screen shake (never game logic)
   utils/
     rng.ts          -- Seeded RNG wrapper. Only source of randomness.
-    timer.ts        -- Shift timer, per-entity timers
   ui/
     App.tsx         -- React root, mounts canvas + UI overlay
     HUD.tsx         -- In-shift overlays: fuel bars, patience meters, streak counter

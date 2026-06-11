@@ -13,6 +13,11 @@ export function ScoreScreen() {
           {stats.departed} departed{stats.departed > 0 && ` — ${stats.departedOnTime} on time`}
         </div>
         <div style={{ color: '#94a3b8' }}>{stats.landed} landed</div>
+        {stats.nearMisses > 0 && (
+          <div style={{ color: '#4ade80' }}>
+            {stats.nearMisses} near-misses — best streak x{stats.bestStreak}
+          </div>
+        )}
         {stats.diverted > 0 && (
           <div style={{ color: '#ef4444' }}>{stats.diverted} diverted — out of fuel</div>
         )}
