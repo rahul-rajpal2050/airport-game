@@ -1,13 +1,41 @@
+import type { CSSProperties } from 'react'
+import { CONFIG } from '../config'
 import { initAudio } from '../game/juice/audio'
-import { startShift } from '../game/loop'
-import { continueRun, getRecords, getRun, hasSavedRun, startRun } from '../game/meta/campaign'
-import { randomSessionSeed } from '../utils/rng'
+import {
+  continueRun,
+  getRecords,
+  getRun,
+  getSettings,
+  hasSavedRun,
+  startFreeShift,
+  startRun,
+  updateSettings,
+} from '../game/meta/campaign'
+import type { Difficulty } from '../game/meta/storage'
 import { buttonStyle, overlayStyle, secondaryButtonStyle } from './overlay'
+
+const toggleStyle: CSSProperties = {
+  fontFamily: 'monospace',
+  fontSize: 12,
+  padding: '6px 14px',
+  background: 'transparent',
+  color: '#64748b',
+  border: '1px solid #334155',
+  borderRadius: 4,
+  cursor: 'pointer',
+}
+
+const toggleActiveStyle: CSSProperties = {
+  ...toggleStyle,
+  color: '#e2e8f0',
+  borderColor: '#4ade80',
+}
 
 export function Menu() {
   const records = getRecords()
   const saved = hasSavedRun()
   const run = getRun()
+  const settings = getSettings()
 
   return (
     <div style={overlayStyle}>
@@ -40,11 +68,32 @@ export function Menu() {
         style={secondaryButtonStyle}
         onClick={() => {
           initAudio()
-          startShift(randomSessionSeed())
+          startFreeShift()
         }}
       >
         FREE SHIFT
       </button>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+        {(Object.keys(CONFIG.difficulty) as Difficulty[]).map((level) => (
+          <button
+            key={level}
+            style={settings.difficulty === level ? toggleActiveStyle : toggleStyle}
+            onClick={() => updateSettings({ difficulty: level })}
+          >
+            {CONFIG.difficulty[level].label}
+          </button>
+        ))}
+        <span style={{ color: '#334155' }}>|</span>
+        <button
+          style={settings.nearMisses ? toggleActiveStyle : toggleStyle}
+          onClick={() => updateSettings({ nearMisses: !settings.nearMisses })}
+        >
+          NEAR-MISS SLOW-MO: {settings.nearMisses ? 'ON' : 'OFF'}
+        </button>
+      </div>
+      <div style={{ color: '#475569', fontSize: 11, maxWidth: 420 }}>
+        easy opens a third runway — hard leaves you one strip
+      </div>
       {records.bestRunScore > 0 && (
         <div style={{ color: '#475569', fontSize: 12 }}>
           best run {records.bestRunScore} — best shift {records.bestShiftScore} — runs completed{' '}

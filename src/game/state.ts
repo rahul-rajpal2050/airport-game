@@ -68,6 +68,8 @@ export interface GameState {
   modifiers: Modifiers
   /** campaign reputation shown in the HUD, null in free-shift mode */
   hudReputation: number | null
+  /** settings toggle: near-miss detection (slow-mo, streaks) */
+  nearMissesEnabled: boolean
 }
 
 export function newGameState(seed: number | string): GameState {
@@ -102,6 +104,7 @@ export function newGameState(seed: number | string): GameState {
     nextRolloutMult: 1,
     modifiers: identityModifiers(),
     hudReputation: null,
+    nearMissesEnabled: true,
   }
 }
 

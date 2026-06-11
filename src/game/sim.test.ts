@@ -105,6 +105,33 @@ describe('full shift simulation', () => {
     expect(eased.stats.diverted).toBeLessThan(base.stats.diverted)
   })
 
+  it('near-miss toggle off produces zero near-misses on a seed that has them', () => {
+    const on = runFullShift('integration-seed', true)
+    expect(on.stats.nearMisses).toBeGreaterThan(0)
+
+    const state = makeShiftState('integration-seed')
+    state.nearMissesEnabled = false
+    const dt = 1 / 60
+    let nextRunway = 0
+    let ended = false
+    while (!ended) {
+      if (state.pendingEvent) resolveEvent(state, 1)
+      for (const plane of state.planes) {
+        if (plane.isAirborneControllable && !plane.assignedRunway) {
+          state.runways[nextRunway++ % state.runways.length].enqueue(plane)
+        }
+        if (!plane.assignedGate && plane.isAirborneControllable) {
+          const g = state.gates.find((g) => g.free)
+          if (g) g.reserve(plane)
+        }
+        if (plane.state === 'boarding' && !plane.assignedRunway) state.runways[0].enqueue(plane)
+      }
+      ended = simulate(state, dt)
+    }
+    expect(state.stats.nearMisses).toBe(0)
+    expect(state.streak).toBe(0)
+  })
+
   it('determinism holds with modifiers active', () => {
     const run = () => {
       const state = makeShiftState('mod-det')

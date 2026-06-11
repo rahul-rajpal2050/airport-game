@@ -50,8 +50,8 @@ export function simulate(state: GameState, dt: number): boolean {
   }
   for (const plane of state.planes) plane.update(dt, updateCtx)
 
-  // 4. near-miss detection
-  detectNearMisses(state)
+  // 4. near-miss detection (settings toggle)
+  if (state.nearMissesEnabled) detectNearMisses(state)
 
   // 5. runway sequencing
   for (const runway of state.runways) runway.sequence(state.shiftTime)

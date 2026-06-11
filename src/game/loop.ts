@@ -28,6 +28,9 @@ export interface ShiftOptions {
   modifiers?: Modifiers
   archetype?: ShiftArchetype
   hudReputation?: number
+  /** difficulty multiplier, combined with the archetype's */
+  spawnRateMult?: number
+  nearMisses?: boolean
 }
 
 export function startShift(seed: number | string, options?: ShiftOptions): void {
@@ -36,11 +39,12 @@ export function startShift(seed: number | string, options?: ShiftOptions): void 
   state = newGameState(seed)
   state.modifiers = options?.modifiers ?? identityModifiers()
   state.hudReputation = options?.hudReputation ?? null
+  state.nearMissesEnabled = options?.nearMisses ?? true
   const archetype = options?.archetype
 
-  const runwayCount = Math.min(
-    CONFIG.runway.count + state.modifiers.extraRunways,
-    CONFIG.runway.positions.length
+  const runwayCount = Math.max(
+    1,
+    Math.min(CONFIG.runway.count + state.modifiers.extraRunways, CONFIG.runway.positions.length)
   )
   state.runways = CONFIG.runway.positions
     .slice(0, runwayCount)
@@ -53,7 +57,7 @@ export function startShift(seed: number | string, options?: ShiftOptions): void 
   state.gates = Array.from({ length: gateCount }, (_, i) => new Gate(i, gateCount))
 
   // fixed RNG draw order — the determinism contract: spawns, then events, then lottery
-  state.schedule = generateSchedule(rng, archetype?.spawnRateMult ?? 1)
+  state.schedule = generateSchedule(rng, (options?.spawnRateMult ?? 1) * (archetype?.spawnRateMult ?? 1))
   state.eventSchedule = generateEventSchedule(rng, {
     count: archetype?.eventCount,
     forced: archetype?.forcedEvents,

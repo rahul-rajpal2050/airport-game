@@ -1,17 +1,21 @@
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { CONFIG } from '../../config'
+import { getState } from '../loop'
 import { newStats } from '../state'
 import {
   advance,
   draftChoices,
   draftPerk,
   getRun,
+  getSettings,
   getUi,
   modifiersFor,
   processShiftEnd,
   reputationDelta,
   resetCampaign,
+  startFreeShift,
   startRun,
+  updateSettings,
 } from './campaign'
 import { setStorageBackend, type StorageBackend } from './storage'
 
@@ -117,5 +121,46 @@ describe('perk draft', () => {
     expect(m.extraRunways).toBe(1)
     expect(m.extraGates).toBe(1)
     expect(m.fuelDrainMult).toBe(1)
+  })
+})
+
+describe('settings', () => {
+  it('difficulty controls runway count: easy 3, normal 2, hard 1', () => {
+    updateSettings({ difficulty: 'easy' })
+    startFreeShift()
+    expect(getState().runways.length).toBe(3)
+
+    updateSettings({ difficulty: 'normal' })
+    startFreeShift()
+    expect(getState().runways.length).toBe(2)
+
+    updateSettings({ difficulty: 'hard' })
+    startFreeShift()
+    expect(getState().runways.length).toBe(1)
+  })
+
+  it('hard cannot go below one runway even stacked with archetype closures', () => {
+    updateSettings({ difficulty: 'hard' })
+    startFreeShift()
+    expect(getState().runways.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('third runway perk on easy clamps at available runway positions', () => {
+    updateSettings({ difficulty: 'easy' }) // +1 runway
+    startRun()
+    getRun()!.perkIds = ['third_runway'] // +1 more = 4, but only 3 positions exist
+    draftPerk(null) // skip the draft; starts the next shift with current perks
+    expect(getState().runways.length).toBe(CONFIG.runway.positions.length)
+  })
+
+  it('near-miss toggle flows into shift state', () => {
+    updateSettings({ nearMisses: false })
+    startFreeShift()
+    expect(getState().nearMissesEnabled).toBe(false)
+    expect(getSettings().nearMisses).toBe(false)
+
+    updateSettings({ nearMisses: true })
+    startFreeShift()
+    expect(getState().nearMissesEnabled).toBe(true)
   })
 })

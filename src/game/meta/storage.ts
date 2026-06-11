@@ -8,6 +8,13 @@ export interface RunState {
   runScore: number
 }
 
+export type Difficulty = 'easy' | 'normal' | 'hard'
+
+export interface Settings {
+  difficulty: Difficulty
+  nearMisses: boolean
+}
+
 export interface SaveData {
   version: 1
   run: RunState | null
@@ -16,6 +23,11 @@ export interface SaveData {
     bestRunScore: number
     runsCompleted: number
   }
+  settings: Settings
+}
+
+export function defaultSettings(): Settings {
+  return { difficulty: 'normal', nearMisses: true }
 }
 
 export interface StorageBackend {
@@ -46,6 +58,7 @@ export function emptySave(): SaveData {
     version: 1,
     run: null,
     records: { bestShiftScore: 0, bestRunScore: 0, runsCompleted: 0 },
+    settings: defaultSettings(),
   }
 }
 
@@ -55,6 +68,8 @@ export function loadSave(): SaveData {
     if (!raw) return emptySave()
     const parsed = JSON.parse(raw) as SaveData
     if (parsed.version !== 1 || typeof parsed.records !== 'object') return emptySave()
+    // older saves predate settings: fill defaults
+    parsed.settings = { ...defaultSettings(), ...parsed.settings }
     return parsed
   } catch {
     return emptySave() // corrupt data: start clean rather than crash

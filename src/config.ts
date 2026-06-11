@@ -244,6 +244,12 @@ export const CONFIG = {
     ] as GameEventDef[],
   },
 
+  difficulty: {
+    easy: { label: 'EASY', extraRunways: 1, spawnRateMult: 0.85 },
+    normal: { label: 'NORMAL', extraRunways: 0, spawnRateMult: 1 },
+    hard: { label: 'HARD', extraRunways: -1, spawnRateMult: 0.75 },
+  },
+
   perks: {
     draftSize: 3,
     defs: [

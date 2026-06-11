@@ -2,7 +2,7 @@ import { CONFIG, identityModifiers, type Modifiers, type PerkDef, type ShiftArch
 import { RNG, randomSessionSeed } from '../../utils/rng'
 import { onShiftEnd, returnToMenu, startShift } from '../loop'
 import { gameStore, type ShiftStats } from '../state'
-import { emptySave, loadSave, persistSave, type RunState, type SaveData } from './storage'
+import { emptySave, loadSave, persistSave, type RunState, type SaveData, type Settings } from './storage'
 
 onShiftEnd((stats) => processShiftEnd(stats))
 
@@ -36,6 +36,30 @@ export function getUi(): CampaignUiState | null {
 
 export function hasSavedRun(): boolean {
   return save.run !== null
+}
+
+export function getSettings(): Settings {
+  return save.settings
+}
+
+export function updateSettings(patch: Partial<Settings>): void {
+  save.settings = { ...save.settings, ...patch }
+  persistSave(save)
+  gameStore.notify()
+}
+
+/** One-off shift outside the campaign, honoring difficulty + toggles */
+export function startFreeShift(): void {
+  active = false
+  ui = null
+  const diff = CONFIG.difficulty[save.settings.difficulty]
+  const modifiers = identityModifiers()
+  modifiers.extraRunways += diff.extraRunways
+  startShift(randomSessionSeed(), {
+    modifiers,
+    spawnRateMult: diff.spawnRateMult,
+    nearMisses: save.settings.nearMisses,
+  })
 }
 
 function shiftSeed(run: RunState): string {
@@ -85,10 +109,15 @@ function beginShift(): void {
   if (!run) return
   active = true
   ui = null
+  const diff = CONFIG.difficulty[save.settings.difficulty]
+  const modifiers = modifiersFor(run)
+  modifiers.extraRunways += diff.extraRunways
   startShift(shiftSeed(run), {
-    modifiers: modifiersFor(run),
+    modifiers,
     archetype: currentArchetype(run),
     hudReputation: run.reputation,
+    spawnRateMult: diff.spawnRateMult,
+    nearMisses: save.settings.nearMisses,
   })
 }
 
