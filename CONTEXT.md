@@ -81,6 +81,11 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
 
 ## Recent Changes
+[2026-06-11] Vertical runway row above the terminal (arrivals land downward,
+departures roll upward end->threshold, hold-short beside rollout end), RUNWAYS
+menu setting 2/3/5 (center always large), difficulty now a pure traffic dial
+(0.8/1/1.15). Refuelling visuals: translucent at gate, green->yellow glow when
+boarding-ready. Fixed PLAY AGAIN bypassing settings. 77 tests passing.
 [2026-06-11] Rahul's redesign phase 1: V-shaped terminal (apex bottom-center, gates
 up both arms), gate count setting (6/8/10/12, default 10), plane size classes
 (small 60s / large 120s circling budgets; large needs L runways/gates, warning on

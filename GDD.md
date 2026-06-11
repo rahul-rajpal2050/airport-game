@@ -16,7 +16,9 @@ later adaptation, not the default.
 
 **Build order** (re-sequenced 2026-06-11 per Rahul's redesign):
 1. ✅ V-terminal, gate setting, size classes, fuel countdown + game over, departure windows, D:00
-2. Refuelling visuals — translucent plane during turnaround, yellow/green glow when boarding-ready
+2. ✅ Vertical runway row above the gates (large center, smalls flanking, 2/3/5 player
+   option; land downward, depart upward) + refuelling visuals (translucent turnaround,
+   green/yellow ready-glow)
 3. 24-hour in-game clock (top-left; score top-right) with rush-hour traffic waves
    (7–9, 11–1, 3–5, 7–9) and day/night visual cycle
 4. Satisfaction scoring — zero-delay/zero-complaint aspiration measured via D:00 and A:00
