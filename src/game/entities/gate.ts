@@ -7,9 +7,10 @@ export class Gate {
   readonly y: number
   reservedBy: Plane | null = null
 
-  constructor(id: number) {
+  constructor(id: number, rowCount = CONFIG.gate.count) {
     this.id = id
-    this.x = CONFIG.gate.firstGateX + id * CONFIG.gate.spacingPixels
+    const rowWidth = (rowCount - 1) * CONFIG.gate.spacingPixels
+    this.x = CONFIG.canvas.width / 2 - rowWidth / 2 + id * CONFIG.gate.spacingPixels
     this.y = CONFIG.gate.terminalY
   }
 

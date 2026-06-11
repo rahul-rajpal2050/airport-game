@@ -29,9 +29,9 @@ export interface GameEventDef {
 
 export const CONFIG = {
   canvas: {
-    // Logical resolution — scaled to fill the viewport
-    width: 390,
-    height: 844,
+    // Logical resolution — scaled to fill the viewport. Landscape, laptop-first.
+    width: 960,
+    height: 600,
     targetFps: 60,
   },
 
@@ -53,34 +53,34 @@ export const CONFIG = {
     occupancySeconds: 8,       // how long a plane blocks the runway after touchdown
     takeoffSeconds: 6,         // runway occupancy for a departure roll
     holdShortOffsetPixels: 26, // departure wait point, offset from threshold
-    lengthPixels: 130,
-    widthPixels: 22,
-    tapPaddingPixels: 14,      // extra hit-test margin for fat fingers
-    // runway positions in logical canvas coords [x, y, angleDegrees]
+    lengthPixels: 150,
+    widthPixels: 24,
+    tapPaddingPixels: 14,      // extra hit-test margin
+    // runway positions in logical canvas coords; index 2 is the Third Runway perk
     positions: [
-      { x: 130, y: 560, angle: -20 },
-      { x: 260, y: 560, angle: 20 },
+      { x: 350, y: 420, angle: -18 },
+      { x: 610, y: 420, angle: 18 },
+      { x: 480, y: 470, angle: 0 },
     ],
   },
 
   gate: {
     count: 6,
     turnaroundSeconds: 30,     // time at gate before plane is ready to depart
-    terminalY: 730,            // gate row vertical position
-    firstGateX: 50,            // x of gate 0; remaining gates spaced evenly
-    spacingPixels: 58,
-    sizePixels: 36,            // gate box side length
+    terminalY: 540,            // gate row vertical position
+    spacingPixels: 70,         // row is centered on the canvas from the gate count
+    sizePixels: 40,            // gate box side length
     tapPaddingPixels: 10,
   },
 
   approach: {
     // Holding circle center and radius, planes orbit here awaiting a runway
-    holdingCenterX: 195,
-    holdingCenterY: 220,
-    holdingRadiusBase: 55,
-    holdingRadiusStep: 22,     // each additional plane expands radius by this
+    holdingCenterX: 480,
+    holdingCenterY: 185,
+    holdingRadiusBase: 70,
+    holdingRadiusStep: 26,     // each additional plane expands radius by this
     orbitSpeedDegreesPerSecond: 26,
-    spawnEdgeMarginPixels: 30, // spawn offset from screen edges
+    spawnEdgeMarginPixels: 40, // spawn offset from screen edges
     fuelJitter: 10,            // initial fuel varies +/- this amount
   },
 
@@ -94,10 +94,10 @@ export const CONFIG = {
     initialPatience: 100,      // out of 100
     patienceDrainPerSecond: 0.3, // while waiting (holding, stuck, boarding)
     scheduleSlackSeconds: 110, // deadline = spawnTime + this; delay measured from it
-    hitRadiusPixels: 24,
+    hitRadiusPixels: 26,
     // Visual size
-    width: 24,
-    height: 14,
+    width: 28,
+    height: 16,
   },
 
   nearMiss: {

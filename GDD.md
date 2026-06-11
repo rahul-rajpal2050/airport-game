@@ -2,9 +2,21 @@
 
 ## Vision
 
-A mobile-first airport tower management game about the controlled unraveling of a system under pressure. Not a puzzle — a juggle. The fantasy is omniscient authority over a chaotic system; the emotional experience is the slow-dawning dread that you were never actually in control.
+An airport tower management game about the controlled unraveling of a system under pressure. Not a puzzle — a juggle. The fantasy is omniscient authority over a chaotic system; the emotional experience is the slow-dawning dread that you were never actually in control.
 
 Think Flight Control's tap-to-route simplicity crossed with the cascade anxiety of Papers Please. Every shift should feel like a short story with a climax.
+
+**The three pillars** (in priority order):
+1. **Addictive** — the five levers below; a failed shift must trigger "one more run"
+2. **Mind-engaging** — triage and sequencing decisions, never reflexes alone
+3. **Social-competitive** — friends compare scores on identical seeded daily shifts
+
+**Platform**: laptop/desktop first (landscape canvas, mouse). Mobile portrait is a
+later adaptation, not the default.
+
+**Build order**: mechanics complete first (roguelite meta, then daily challenge +
+leaderboard), visual overhaul last — target is **2.5D isometric** (altitude
+shadows, banking planes, depth-sorted terminal), not the placeholder top-down.
 
 ---
 
@@ -148,8 +160,10 @@ This is a deliberate simplification from Flight Control. The complexity lives in
 
 ## Art Direction
 
-Phase 1 is rectangles and circles. When art comes in:
-- Top-down airport view, slightly isometric feel
+Placeholder phase is rectangles and circles. The target (post-mechanics overhaul):
+- **2.5D isometric**: angled perspective, altitude shadows under airborne planes,
+  planes banking into turns, depth-sorted terminal buildings, textured terrain
+- Landscape composition for laptop screens (Mini Metro / Monument Valley polish tier)
 - Color language: green = clear, yellow = caution, red = critical, blue = VIP
 - Planes are distinct silhouettes (regional jet, widebody, cargo)
 - Runways feel like runways — painted markings, edge lighting at night shifts
