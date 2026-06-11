@@ -81,6 +81,14 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
 
 ## Recent Changes
+[2026-06-11] Rahul's redesign phase 1: V-shaped terminal (apex bottom-center, gates
+up both arms), gate count setting (6/8/10/12, default 10), plane size classes
+(small 60s / large 120s circling budgets; large needs L runways/gates, warning on
+mismatch), fuel countdown with GAME OVER on empty (replaces fuel diversions),
+3-minute gate departure window with score drip when overdue, D:00 rate in HUD and
+score screen. Spawn curve retuned capacity-aware (4->8/min). 76 tests passing.
+Roadmap re-sequenced in GDD: refuelling visuals -> 24h clock + day/night ->
+satisfaction scoring -> leaderboard -> isometric.
 [2026-06-11] Post-feedback batch: event dialogs resolve independently of the rAF
 loop (fixes frozen-dialog symptom); jet silhouettes + altitude shadows + gradient/
 apron/vignette background; difficulty setting (easy 3 runways / normal 2 / hard 1,

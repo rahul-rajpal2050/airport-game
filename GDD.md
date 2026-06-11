@@ -14,9 +14,14 @@ Think Flight Control's tap-to-route simplicity crossed with the cascade anxiety 
 **Platform**: laptop/desktop first (landscape canvas, mouse). Mobile portrait is a
 later adaptation, not the default.
 
-**Build order**: mechanics complete first (roguelite meta, then daily challenge +
-leaderboard), visual overhaul last — target is **2.5D isometric** (altitude
-shadows, banking planes, depth-sorted terminal), not the placeholder top-down.
+**Build order** (re-sequenced 2026-06-11 per Rahul's redesign):
+1. ✅ V-terminal, gate setting, size classes, fuel countdown + game over, departure windows, D:00
+2. Refuelling visuals — translucent plane during turnaround, yellow/green glow when boarding-ready
+3. 24-hour in-game clock (top-left; score top-right) with rush-hour traffic waves
+   (7–9, 11–1, 3–5, 7–9) and day/night visual cycle
+4. Satisfaction scoring — zero-delay/zero-complaint aspiration measured via D:00 and A:00
+5. Daily challenge + leaderboard (friends competition; architecture ready via seeded runs)
+6. 2.5D isometric visual overhaul (altitude shadows, banking planes, depth-sorted terminal)
 
 ---
 
@@ -46,13 +51,23 @@ The **primary resource** is attention, not money. Runway slots and gates are fin
 | Gate | `free → occupied → turning_around` |
 | Shift | `pre_shift → active → post_shift` |
 
+**Size classes** (added 2026-06-11): planes are **small** or **large** (~35% large,
+seeded). Small planes use any runway/gate; large planes need **large** runways and
+gates (marked L). Wrong assignment = warning, not acceptance. Large planes carry
+double the circling fuel. The airport is a **V-shaped terminal** (apex bottom-center,
+gates up both arms, count player-configurable 6–12, default 10) with runways mid-field.
+
+**Departure window**: after turnaround, each flight has 3 minutes at the gate to get
+a departure slot. Beyond it the score bleeds and the flight counts as delayed.
+**D:00 rate** (on-time departures / total departures) is the headline operational metric.
+
 ---
 
 ## Failure States
 
-Failure is never binary — it's a spiral. The game should feel like watching a controlled explosion in slow motion.
+Most failure is a spiral — but one mistake is fatal (revised 2026-06-11).
 
-1. **Fuel exhaustion** — plane circles too long (fuel bar drains). Forced emergency landing anywhere or divert (big rep hit). Triggered by runway congestion.
+1. **Fuel exhaustion = GAME OVER** — fuel is a circling countdown (small planes 60s, large 120s) with an always-visible green/yellow/red bar. A plane running dry ends the shift on the spot, naming the flight. This is the run-ending mistake; everything else bleeds.
 2. **Runway collision** — two planes assigned the same slot simultaneously. Instant catastrophic event. Rare but dramatic.
 3. **Gate overflow** — all gates full, landed plane sits on runway blocking others. Cascade trigger.
 4. **Passenger patience zero** — per-flight timer. If a plane sits at gate too long or departs very late, passengers rage. Reputation drains. Not instant death — slow bleed.
