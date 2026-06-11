@@ -98,29 +98,39 @@ export const CONFIG = {
     lengthPixels: 150,
     widthPixels: 24,
     tapPaddingPixels: 14,      // extra hit-test margin
-    // runway positions in logical canvas coords; index 2 is the Third Runway perk
+    // runway positions in logical canvas coords; index 2 is the Third Runway perk.
+    // The V-terminal owns the bottom of the field, so runways sit mid-field.
     positions: [
-      { x: 350, y: 420, angle: -18 },
-      { x: 610, y: 420, angle: 18 },
-      { x: 480, y: 470, angle: 0 },
+      { x: 320, y: 330, angle: -15 },
+      { x: 640, y: 330, angle: 15 },
+      { x: 480, y: 272, angle: 0 },
     ],
   },
 
   gate: {
-    count: 6,
+    count: 10,                 // default; player picks 6/8/10/12 on the menu
     turnaroundSeconds: 30,     // time at gate before plane is ready to depart
-    terminalY: 540,            // gate row vertical position
-    spacingPixels: 70,         // row is centered on the canvas from the gate count
-    sizePixels: 40,            // gate box side length
+    departWindowSeconds: 180,  // boarding countdown; past it the departure is delayed
+    // V-shaped terminal: apex at bottom-center, arms rising outward.
+    // Even gate ids fill the left arm, odd the right, expanding outward.
+    apexX: 480,
+    apexY: 572,
+    armAngleDeg: 24,
+    armStartOffset: 52,        // distance from apex to the innermost gates
+    spacingPixels: 54,         // along-arm gap between gates
+    sizePixels: 34,            // small gate box side length
+    largeSizePixels: 44,
+    largeEvery: 3,             // gate ids divisible by this are large
     tapPaddingPixels: 10,
   },
 
   approach: {
-    // Holding circle center and radius, planes orbit here awaiting a runway
+    // Holding circle center and radius, planes orbit here awaiting a runway.
+    // Compact and high: the field below belongs to runways and the V-terminal.
     holdingCenterX: 480,
-    holdingCenterY: 185,
-    holdingRadiusBase: 70,
-    holdingRadiusStep: 26,     // each additional plane expands radius by this
+    holdingCenterY: 128,
+    holdingRadiusBase: 48,
+    holdingRadiusStep: 16,     // each additional plane expands radius by this
     orbitSpeedDegreesPerSecond: 26,
     spawnEdgeMarginPixels: 40, // spawn offset from screen edges
     fuelJitter: 10,            // initial fuel varies +/- this amount

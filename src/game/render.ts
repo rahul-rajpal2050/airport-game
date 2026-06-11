@@ -65,12 +65,12 @@ function drawBackground(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = bgGradient
   ctx.fillRect(0, 0, width, height)
 
-  // apron: the paved field around runways and terminal
+  // apron: the paved field around runways and the V-terminal
   ctx.fillStyle = COLORS.apron
   ctx.strokeStyle = COLORS.apronEdge
   ctx.lineWidth = 1
   ctx.beginPath()
-  ctx.roundRect(220, 350, 520, 240, 18)
+  ctx.roundRect(190, 232, 580, 358, 18)
   ctx.fill()
   ctx.stroke()
 
@@ -107,17 +107,31 @@ export function draw(ctx: CanvasRenderingContext2D, state: GameState): void {
 
 function drawTerminal(ctx: CanvasRenderingContext2D, gates: Gate[]): void {
   if (gates.length === 0) return
-  const size = CONFIG.gate.sizePixels
-  const pad = 14
-  const left = gates[0].x - size / 2 - pad
-  const right = gates[gates.length - 1].x + size / 2 + pad
-  // terminal building strip behind the gate row
-  ctx.fillStyle = COLORS.terminal
-  ctx.fillRect(left, CONFIG.gate.terminalY + size / 2, right - left, 28)
+  const G = CONFIG.gate
+
+  // V-terminal building: two arm strips from the apex out past the last gate
+  ctx.strokeStyle = COLORS.terminal
+  ctx.lineCap = 'round'
+  ctx.lineWidth = G.sizePixels + 18
+  for (const arm of [-1, 1]) {
+    const armGates = gates.filter((g) => (g.id % 2 === 0 ? -1 : 1) === arm)
+    if (armGates.length === 0) continue
+    const outer = armGates[armGates.length - 1]
+    const overshoot = 36
+    const dx = outer.x - G.apexX
+    const dy = outer.y - G.apexY
+    const len = Math.hypot(dx, dy)
+    ctx.beginPath()
+    ctx.moveTo(G.apexX, G.apexY)
+    ctx.lineTo(G.apexX + (dx / len) * (len + overshoot), G.apexY + (dy / len) * (len + overshoot))
+    ctx.stroke()
+  }
+  ctx.lineCap = 'butt'
 
   ctx.font = `${CONFIG.ui.hudFontSize - 2}px monospace`
   ctx.textAlign = 'center'
   for (const gate of gates) {
+    const size = CONFIG.gate.sizePixels
     if (gate.occupied) {
       ctx.fillStyle = COLORS.gateOccupied
       ctx.fillRect(gate.x - size / 2, gate.y - size / 2, size, size)
@@ -133,7 +147,7 @@ function drawTerminal(ctx: CanvasRenderingContext2D, gates: Gate[]): void {
       ctx.strokeRect(gate.x - size / 2, gate.y - size / 2, size, size)
     }
     ctx.fillStyle = COLORS.hud
-    ctx.fillText(`G${gate.id + 1}`, gate.x, gate.y + size / 2 + 20)
+    ctx.fillText(`G${gate.id + 1}`, gate.x, gate.y + size / 2 + 16)
   }
 }
 

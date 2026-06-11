@@ -153,6 +153,22 @@ describe('settings', () => {
     expect(getState().runways.length).toBe(CONFIG.runway.positions.length)
   })
 
+  it('gate count setting flows into the shift (default 10, perk adds one)', () => {
+    expect(getSettings().gateCount).toBe(10)
+    startFreeShift()
+    expect(getState().gates.length).toBe(10)
+
+    updateSettings({ gateCount: 6 })
+    startFreeShift()
+    expect(getState().gates.length).toBe(6)
+
+    updateSettings({ gateCount: 12 })
+    startRun()
+    getRun()!.perkIds = ['seventh_gate']
+    draftPerk(null)
+    expect(getState().gates.length).toBe(13)
+  })
+
   it('near-miss toggle flows into shift state', () => {
     updateSettings({ nearMisses: false })
     startFreeShift()

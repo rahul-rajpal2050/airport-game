@@ -81,6 +81,10 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
 
 ## Recent Changes
+[2026-06-11] Post-feedback batch: event dialogs resolve independently of the rAF
+loop (fixes frozen-dialog symptom); jet silhouettes + altitude shadows + gradient/
+apron/vignette background; difficulty setting (easy 3 runways / normal 2 / hard 1,
+spawn-rate scaled) and near-miss slow-mo toggle, both persisted. 68 tests passing.
 [2026-06-11] Phase 4 complete: roguelite campaign. 5-shift runs with archetypes
 (morning rush, storm front, VIP day, understaffed, chaos); reputation as currency;
 6 perks drafted between shifts (cost rep, deterministic per-run drafts); versioned

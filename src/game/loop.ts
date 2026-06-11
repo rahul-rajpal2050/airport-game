@@ -31,6 +31,8 @@ export interface ShiftOptions {
   /** difficulty multiplier, combined with the archetype's */
   spawnRateMult?: number
   nearMisses?: boolean
+  /** player's gate-count setting (perk extraGates added on top) */
+  gateCount?: number
 }
 
 export function startShift(seed: number | string, options?: ShiftOptions): void {
@@ -53,8 +55,8 @@ export function startShift(seed: number | string, options?: ShiftOptions): void 
     const runway = state.runways[closedId]
     if (runway) runway.closedUntil = Infinity
   }
-  const gateCount = CONFIG.gate.count + state.modifiers.extraGates
-  state.gates = Array.from({ length: gateCount }, (_, i) => new Gate(i, gateCount))
+  const gateCount = (options?.gateCount ?? CONFIG.gate.count) + state.modifiers.extraGates
+  state.gates = Array.from({ length: gateCount }, (_, i) => new Gate(i))
 
   // fixed RNG draw order — the determinism contract: spawns, then events, then lottery
   state.schedule = generateSchedule(rng, (options?.spawnRateMult ?? 1) * (archetype?.spawnRateMult ?? 1))

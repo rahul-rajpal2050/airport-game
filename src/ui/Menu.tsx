@@ -91,6 +91,18 @@ export function Menu() {
           NEAR-MISS SLOW-MO: {settings.nearMisses ? 'ON' : 'OFF'}
         </button>
       </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <span style={{ color: '#64748b', fontFamily: 'monospace', fontSize: 12 }}>GATES</span>
+        {[6, 8, 10, 12].map((n) => (
+          <button
+            key={n}
+            style={settings.gateCount === n ? toggleActiveStyle : toggleStyle}
+            onClick={() => updateSettings({ gateCount: n })}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
       <div style={{ color: '#475569', fontSize: 11, maxWidth: 420 }}>
         easy opens a third runway — hard leaves you one strip
       </div>

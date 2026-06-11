@@ -59,6 +59,7 @@ export function startFreeShift(): void {
     modifiers,
     spawnRateMult: diff.spawnRateMult,
     nearMisses: save.settings.nearMisses,
+    gateCount: save.settings.gateCount,
   })
 }
 
@@ -118,6 +119,7 @@ function beginShift(): void {
     hudReputation: run.reputation,
     spawnRateMult: diff.spawnRateMult,
     nearMisses: save.settings.nearMisses,
+    gateCount: save.settings.gateCount,
   })
 }
 

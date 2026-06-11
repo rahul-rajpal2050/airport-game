@@ -13,6 +13,7 @@ export type Difficulty = 'easy' | 'normal' | 'hard'
 export interface Settings {
   difficulty: Difficulty
   nearMisses: boolean
+  gateCount: number
 }
 
 export interface SaveData {
@@ -27,7 +28,7 @@ export interface SaveData {
 }
 
 export function defaultSettings(): Settings {
-  return { difficulty: 'normal', nearMisses: true }
+  return { difficulty: 'normal', nearMisses: true, gateCount: 10 }
 }
 
 export interface StorageBackend {

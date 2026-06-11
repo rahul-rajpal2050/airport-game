@@ -123,7 +123,8 @@ export class Plane {
       this.assignedRunway = null // arrival complete; departure needs a fresh assignment
     } else if (to === 'at_gate') {
       this.gateTimer = 0
-      this.heading = -Math.PI / 2 // nose to the terminal
+      // nose toward the V apex — parked planes read as docked at the terminal
+      this.heading = Math.atan2(CONFIG.gate.apexY - this.y, CONFIG.gate.apexX - this.x)
     } else if (to === 'taxiing_out' && this.assignedRunway) {
       this.taxiTarget = this.assignedRunway.holdShortPoint()
       this.atHoldShort = false

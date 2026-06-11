@@ -258,6 +258,27 @@ describe('Runway mixed queue', () => {
 })
 
 describe('Gate', () => {
+  it('V layout: symmetric arms, all gates above the apex, no overlaps', () => {
+    const gates = Array.from({ length: 10 }, (_, i) => new Gate(i))
+    const G = CONFIG.gate
+    for (const g of gates) {
+      expect(g.y).toBeLessThan(G.apexY)
+      // even ids left of apex, odd ids right
+      if (g.id % 2 === 0) expect(g.x).toBeLessThan(G.apexX)
+      else expect(g.x).toBeGreaterThan(G.apexX)
+    }
+    // mirrored pairs sit at the same height
+    expect(gates[0].y).toBeCloseTo(gates[1].y)
+    expect(gates[8].y).toBeCloseTo(gates[9].y)
+    // no two gates closer than a box width
+    for (let i = 0; i < gates.length; i++) {
+      for (let j = i + 1; j < gates.length; j++) {
+        const d = Math.hypot(gates[i].x - gates[j].x, gates[i].y - gates[j].y)
+        expect(d).toBeGreaterThan(G.sizePixels)
+      }
+    }
+  })
+
   it('reserve, occupy, release lifecycle', () => {
     const gate = new Gate(0)
     const plane = makePlane()
