@@ -307,6 +307,19 @@ function drawPlane(ctx: CanvasRenderingContext2D, plane: Plane, selected: boolea
   ctx.translate(plane.x, plane.y)
   ctx.rotate(plane.heading)
   ctx.scale(scale, scale)
+  if (plane.state === 'at_gate') {
+    // refuelling / boarding passengers: ghosted out until turnaround completes
+    ctx.globalAlpha = 0.45
+  } else if (plane.state === 'boarding' && plane.boardingStart !== null) {
+    // ready to depart: pulsing glow, green while fresh, yellow as the window drains
+    const remaining = Math.max(
+      0,
+      1 - (shiftTime - plane.boardingStart) / CONFIG.gate.departWindowSeconds
+    )
+    ctx.shadowColor =
+      plane.gateDelaySeconds > 0 ? COLORS.planeCritical : remaining > 0.5 ? COLORS.fuelGreen : COLORS.fuelBar
+    ctx.shadowBlur = (10 + 5 * Math.sin(shiftTime * 6)) * scale
+  }
   ctx.fillStyle = planeColor(plane, shiftTime)
   ctx.fill(getPlanePath())
   ctx.restore()

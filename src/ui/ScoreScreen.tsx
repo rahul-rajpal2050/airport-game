@@ -1,6 +1,5 @@
-import { getState, startShift } from '../game/loop'
-import { advance, getUi, isCampaignActive } from '../game/meta/campaign'
-import { randomSessionSeed } from '../utils/rng'
+import { getState } from '../game/loop'
+import { advance, getUi, isCampaignActive, startFreeShift } from '../game/meta/campaign'
 import { buttonStyle, overlayStyle } from './overlay'
 
 export function ScoreScreen() {
@@ -73,7 +72,7 @@ export function ScoreScreen() {
           CONTINUE
         </button>
       ) : (
-        <button style={buttonStyle} onClick={() => startShift(randomSessionSeed())}>
+        <button style={buttonStyle} onClick={startFreeShift}>
           PLAY AGAIN
         </button>
       )}
