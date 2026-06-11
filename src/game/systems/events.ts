@@ -1,6 +1,6 @@
 import { CONFIG, type EventEffect, type GameEventDef } from '../../config'
 import type { RNG } from '../../utils/rng'
-import type { GameState } from '../state'
+import { gameStore, type GameState } from '../state'
 
 export interface ScheduledEvent {
   defId: string
@@ -109,6 +109,9 @@ export function resolveEvent(state: GameState, optionIndex: 0 | 1): void {
   if (!pending) return
   applyEffects(state, pending.def.options[optionIndex].effects, pending)
   state.pendingEvent = null
+  // notify directly so the dialog closes even if the rAF loop is stalled —
+  // the loop's prevPending check stays as the open-side notifier
+  gameStore.notify()
 }
 
 function applyEffects(state: GameState, effects: EventEffect[], pending: PendingEvent): void {
