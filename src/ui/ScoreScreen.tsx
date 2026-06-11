@@ -7,11 +7,27 @@ export function ScoreScreen() {
   const { stats, seed } = getState()
   const campaign = isCampaignActive() ? getUi() : null
 
+  const gameOver = stats.gameOverCallsign !== ''
   return (
     <div style={overlayStyle}>
-      <h2 style={{ fontSize: 22, margin: 0, color: '#94a3b8' }}>SHIFT COMPLETE</h2>
-      <div style={{ fontSize: 48, fontWeight: 'bold' }}>{stats.score}</div>
+      {gameOver ? (
+        <>
+          <h2 style={{ fontSize: 26, margin: 0, color: '#ef4444' }}>GAME OVER</h2>
+          <div style={{ color: '#ef4444', fontSize: 15 }}>
+            {stats.gameOverCallsign} ran out of fuel circling
+          </div>
+        </>
+      ) : (
+        <h2 style={{ fontSize: 22, margin: 0, color: '#94a3b8' }}>SHIFT COMPLETE</h2>
+      )}
+      <div style={{ fontSize: 48, fontWeight: 'bold' }}>{Math.round(stats.score)}</div>
       <div style={{ lineHeight: 2, fontSize: 15 }}>
+        {stats.departed > 0 && (
+          <div style={{ fontWeight: 'bold', color: '#4ade80' }}>
+            D:00 {Math.round((100 * stats.departedOnTime) / stats.departed)}% —{' '}
+            {stats.departedOnTime}/{stats.departed} on time
+          </div>
+        )}
         <div>
           {stats.departed} departed{stats.departed > 0 && ` — ${stats.departedOnTime} on time`}
         </div>

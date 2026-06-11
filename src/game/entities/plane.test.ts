@@ -66,7 +66,7 @@ describe('Plane state machine', () => {
     expect(() => plane.transition('departed')).toThrow(/Illegal transition/)
   })
 
-  it('diverts when fuel runs out while holding', () => {
+  it('fuel exhaustion while circling emits fuel_out (game over), not a diversion', () => {
     const plane = makePlane(1)
     const ctx = makeCtx()
     plane.transition('holding')
@@ -74,8 +74,37 @@ describe('Plane state machine', () => {
 
     plane.update(3, ctx)
 
-    expect(plane.state).toBe('diverted')
-    expect(ctx.events.some((e) => e.type === 'diverted')).toBe(true)
+    expect(plane.state).toBe('holding') // the shift ends; the plane does not transition
+    expect(plane.fuel).toBe(0)
+    expect(ctx.events.some((e) => e.type === 'fuel_out')).toBe(true)
+    expect(ctx.events.some((e) => e.type === 'diverted')).toBe(false)
+  })
+
+  it('per-size circling budgets: small lasts 60s, large 120s', () => {
+    const small = new Plane(1, 'SM100', 0, 0, 100, 0, 'small')
+    const large = new Plane(2, 'LG200', 0, 0, 100, 0, 'large')
+    const ctx = makeCtx()
+    for (const p of [small, large]) {
+      p.transition('holding')
+      p.ringIndex = p.id
+    }
+
+    small.update(59, ctx)
+    expect(small.fuel).toBeGreaterThan(0)
+    small.update(2, ctx)
+    expect(ctx.events.filter((e) => e.type === 'fuel_out')).toHaveLength(1)
+
+    large.update(119, ctx)
+    expect(large.fuel).toBeGreaterThan(0)
+    large.update(2, ctx)
+    expect(ctx.events.filter((e) => e.type === 'fuel_out')).toHaveLength(2)
+  })
+
+  it('approach does not burn fuel; only circling does', () => {
+    const plane = makePlane(100)
+    const ctx = makeCtx()
+    plane.update(10, ctx) // approaching toward the holding stack
+    expect(plane.fuel).toBe(100)
   })
 
   it('THE cascade: no gate means the plane blocks the runway and the next arrival waits', () => {
@@ -203,6 +232,86 @@ describe('Plane state machine', () => {
     const before = plane.patience
     plane.update(5, ctx) // turnaround ticking
     expect(plane.patience).toBe(before)
+  })
+})
+
+describe('Size classes', () => {
+  it('large planes are rejected by small runways and gates; small planes go anywhere', () => {
+    const smallRunway = new Runway(0, 320, 330, -15, 'small')
+    const largeRunway = new Runway(1, 480, 272, 0, 'large')
+    const smallGate = new Gate(1) // id 1: not divisible by largeEvery
+    const largeGate = new Gate(0) // id 0: large
+    const big = new Plane(1, 'BG100', 0, 0, 100, 0, 'large')
+    const little = new Plane(2, 'LT200', 0, 0, 100, 0, 'small')
+
+    expect(smallRunway.canAccept(big)).toBe(false)
+    expect(largeRunway.canAccept(big)).toBe(true)
+    expect(smallRunway.canAccept(little)).toBe(true)
+    expect(smallGate.canAccept(big)).toBe(false)
+    expect(largeGate.canAccept(big)).toBe(true)
+    expect(smallGate.canAccept(little)).toBe(true)
+
+    // guarded entry points are no-ops on mismatch
+    smallRunway.enqueue(big)
+    expect(smallRunway.queue).toHaveLength(0)
+    expect(big.assignedRunway).toBeNull()
+    smallGate.reserve(big)
+    expect(smallGate.free).toBe(true)
+    expect(big.assignedGate).toBeNull()
+  })
+
+  it('every-3rd gate is large', () => {
+    const gates = Array.from({ length: 12 }, (_, i) => new Gate(i))
+    const largeIds = gates.filter((g) => g.size === 'large').map((g) => g.id)
+    expect(largeIds).toEqual([0, 3, 6, 9])
+  })
+})
+
+describe('Boarding departure window', () => {
+  it('tracks overdue seconds and reports them at wheels-up', () => {
+    const runway = new Runway(0, 320, 330, -15, 'large')
+    const gate = new Gate(0)
+    const plane = makePlane()
+    const ctx = makeCtx()
+    gate.reserve(plane)
+    plane.transition('holding')
+    plane.ringIndex = 0
+    runway.enqueue(plane)
+    runway.sequence()
+    runUntil(plane, ctx, () => plane.state === 'boarding', 200)
+    expect(plane.boardingStart).not.toBeNull()
+
+    // wait out the full window plus 30 seconds
+    ctx.shiftTime = plane.boardingStart! + CONFIG.gate.departWindowSeconds + 30
+    plane.update(0.1, ctx)
+    expect(plane.gateDelaySeconds).toBeCloseTo(30, 0)
+
+    runway.enqueue(plane) // departure
+    runUntil(plane, ctx, () => plane.atHoldShort, 60)
+    runway.sequence()
+    runUntil(plane, ctx, () => plane.wheelsUp, 60)
+    const evt = ctx.events.find((e) => e.type === 'departed_ok')!
+    expect(evt.type === 'departed_ok' && Math.round(evt.delaySeconds)).toBe(30)
+  })
+
+  it('departing within the window reports zero delay (D:00)', () => {
+    const runway = new Runway(0, 320, 330, -15, 'large')
+    const gate = new Gate(0)
+    const plane = makePlane()
+    const ctx = makeCtx()
+    gate.reserve(plane)
+    plane.transition('holding')
+    plane.ringIndex = 0
+    runway.enqueue(plane)
+    runway.sequence()
+    runUntil(plane, ctx, () => plane.state === 'boarding', 200)
+
+    runway.enqueue(plane)
+    runUntil(plane, ctx, () => plane.atHoldShort, 60)
+    runway.sequence()
+    runUntil(plane, ctx, () => plane.wheelsUp, 60)
+    const evt = ctx.events.find((e) => e.type === 'departed_ok')!
+    expect(evt.type === 'departed_ok' && evt.delaySeconds).toBe(0)
   })
 })
 

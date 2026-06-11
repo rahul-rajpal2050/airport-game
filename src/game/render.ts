@@ -44,6 +44,7 @@ const COLORS = {
   streak: '#4ade80',
   vip: '#60a5fa',
   slowMoTint: 'rgba(96, 165, 250, 0.07)',
+  fuelGreen: '#4ade80',
   fuelBar: '#facc15',
   patienceBar: '#fb923c',
   barBg: 'rgba(148, 163, 184, 0.25)',
@@ -131,7 +132,7 @@ function drawTerminal(ctx: CanvasRenderingContext2D, gates: Gate[]): void {
   ctx.font = `${CONFIG.ui.hudFontSize - 2}px monospace`
   ctx.textAlign = 'center'
   for (const gate of gates) {
-    const size = CONFIG.gate.sizePixels
+    const size = gate.boxSize
     if (gate.occupied) {
       ctx.fillStyle = COLORS.gateOccupied
       ctx.fillRect(gate.x - size / 2, gate.y - size / 2, size, size)
@@ -142,12 +143,12 @@ function drawTerminal(ctx: CanvasRenderingContext2D, gates: Gate[]): void {
       ctx.strokeRect(gate.x - size / 2, gate.y - size / 2, size, size)
       ctx.setLineDash([])
     } else {
-      ctx.strokeStyle = COLORS.gateFree
-      ctx.lineWidth = 1
+      ctx.strokeStyle = gate.size === 'large' ? COLORS.hudBright : COLORS.gateFree
+      ctx.lineWidth = gate.size === 'large' ? 1.5 : 1
       ctx.strokeRect(gate.x - size / 2, gate.y - size / 2, size, size)
     }
     ctx.fillStyle = COLORS.hud
-    ctx.fillText(`G${gate.id + 1}`, gate.x, gate.y + size / 2 + 16)
+    ctx.fillText(`G${gate.id + 1}${gate.size === 'large' ? '·L' : ''}`, gate.x, gate.y + size / 2 + 16)
   }
 }
 
@@ -167,7 +168,8 @@ function drawHoldingRings(ctx: CanvasRenderingContext2D, state: GameState): void
 }
 
 function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, shiftTime: number): void {
-  const { lengthPixels, widthPixels } = CONFIG.runway
+  const { lengthPixels } = CONFIG.runway
+  const widthPixels = runway.width
   const closed = shiftTime < runway.closedUntil
   ctx.save()
   ctx.translate(runway.x, runway.y)
@@ -190,6 +192,12 @@ function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, shiftTime: nu
   ctx.fillStyle = COLORS.runwayStripe
   ctx.fillRect(-lengthPixels / 2, -widthPixels / 2, 4, widthPixels)
 
+  // size tag at the threshold: L accepts everyone, S is narrow-body only
+  ctx.fillStyle = runway.size === 'large' ? COLORS.hudBright : COLORS.hud
+  ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
+  ctx.textAlign = 'center'
+  ctx.fillText(runway.size === 'large' ? 'L' : 'S', -lengthPixels / 2 - 12, 4)
+
   if (closed) {
     // diagonal hatching + label
     ctx.strokeStyle = COLORS.planeCritical
@@ -202,7 +210,6 @@ function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, shiftTime: nu
     }
     ctx.fillStyle = COLORS.planeCritical
     ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
-    ctx.textAlign = 'center'
     ctx.fillText('CLOSED', 0, -widthPixels / 2 - 6)
   } else if (!runway.free) {
     ctx.strokeStyle = COLORS.planeCritical
@@ -279,7 +286,7 @@ function drawPlane(ctx: CanvasRenderingContext2D, plane: Plane, selected: boolea
 
   ctx.restore()
 
-  const scale = CONFIG.plane.width / PLANE_BASELINE_WIDTH
+  const scale = (CONFIG.plane.width / PLANE_BASELINE_WIDTH) * CONFIG.plane.sizes[plane.size].visualScale
   const airborne =
     plane.isAirborneControllable ||
     plane.state === 'landing' ||
@@ -304,36 +311,53 @@ function drawPlane(ctx: CanvasRenderingContext2D, plane: Plane, selected: boolea
   ctx.fill(getPlanePath())
   ctx.restore()
 
-  // callsign + fuel bar (airborne)
+  // callsign + always-on fuel countdown bar (airborne)
   if (plane.isAirborneControllable) {
     ctx.fillStyle = COLORS.hud
     ctx.font = `${CONFIG.ui.hudFontSize - 2}px monospace`
     ctx.textAlign = 'center'
-    ctx.fillText(plane.callsign, plane.x, plane.y - h - 8)
+    ctx.fillText(plane.callsign, plane.x, plane.y - h - 10)
 
-    if (plane.fuel <= CONFIG.ui.fuelWarningThreshold) {
-      drawBar(ctx, plane, plane.fuel,
-        plane.fuel <= CONFIG.ui.fuelWarningThreshold / 2 ? COLORS.planeCritical : COLORS.fuelBar)
-    }
+    drawBar(ctx, plane, plane.fuel / 100, fuelColor(plane.fuel / 100))
     return
   }
 
-  // patience bar on waiting ground planes (stuck on runway / boarding / hold-short)
-  const waitingOnGround =
-    stuck || plane.state === 'boarding' || (plane.state === 'taxiing_out' && plane.atHoldShort)
+  // boarding: the 3-minute departure countdown
+  if (plane.state === 'boarding' && plane.boardingStart !== null) {
+    const remaining = Math.max(
+      0,
+      1 - (shiftTime - plane.boardingStart) / CONFIG.gate.departWindowSeconds
+    )
+    const overdue = plane.gateDelaySeconds > 0
+    const color = overdue
+      ? Math.sin(shiftTime * 8) > 0 ? COLORS.planeCritical : COLORS.barBg // overdue: flashing red
+      : fuelColor(remaining)
+    drawBar(ctx, plane, overdue ? 1 : remaining, color)
+    return
+  }
+
+  // patience bar on other waiting ground planes (stuck on runway / hold-short)
+  const waitingOnGround = stuck || (plane.state === 'taxiing_out' && plane.atHoldShort)
   if (waitingOnGround && plane.patience <= CONFIG.ui.patienceWarningThreshold * 2) {
-    drawBar(ctx, plane, plane.patience,
+    drawBar(ctx, plane, plane.patience / 100,
       plane.patience <= CONFIG.ui.patienceWarningThreshold ? COLORS.planeCritical : COLORS.patienceBar)
   }
 }
 
-function drawBar(ctx: CanvasRenderingContext2D, plane: Plane, value: number, color: string): void {
-  const barW = CONFIG.plane.width + 6
-  const y = plane.y - CONFIG.plane.height - 6
+/** green above half, yellow above a quarter, red below — fraction in [0,1] */
+function fuelColor(fraction: number): string {
+  if (fraction > 0.5) return COLORS.fuelGreen
+  if (fraction > 0.25) return COLORS.fuelBar
+  return COLORS.planeCritical
+}
+
+function drawBar(ctx: CanvasRenderingContext2D, plane: Plane, fraction: number, color: string): void {
+  const barW = CONFIG.plane.width + 8
+  const y = plane.y - CONFIG.plane.height - 7
   ctx.fillStyle = COLORS.barBg
-  ctx.fillRect(plane.x - barW / 2, y, barW, 3)
+  ctx.fillRect(plane.x - barW / 2, y, barW, 4)
   ctx.fillStyle = color
-  ctx.fillRect(plane.x - barW / 2, y, barW * (value / 100), 3)
+  ctx.fillRect(plane.x - barW / 2, y, barW * Math.max(0, Math.min(1, fraction)), 4)
 }
 
 function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
@@ -357,7 +381,17 @@ function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
   ctx.font = `${CONFIG.ui.hudFontSize}px monospace`
   ctx.fillStyle = COLORS.hud
   ctx.textAlign = 'center'
-  ctx.fillText(`${airborne} inbound`, width / 2, pad + 16)
+  const d00 =
+    state.stats.departed > 0
+      ? ` · D:00 ${Math.round((100 * state.stats.departedOnTime) / state.stats.departed)}%`
+      : ''
+  ctx.fillText(`${airborne} inbound${d00}`, width / 2, pad + 16)
+
+  if (state.warning) {
+    ctx.fillStyle = COLORS.planeWarning
+    ctx.font = `bold ${CONFIG.ui.hudFontSize + 2}px monospace`
+    ctx.fillText(state.warning.text, width / 2, pad + 70)
+  }
 
   if (state.streak > 0) {
     ctx.fillStyle = COLORS.streak

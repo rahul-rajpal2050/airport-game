@@ -2,8 +2,16 @@ import { CONFIG } from '../../config'
 import type { GameState } from '../state'
 
 /** Consume this frame's events into score and stats (sim hands them to juice after) */
-export function applyScoring(state: GameState): void {
+export function applyScoring(state: GameState, dt: number): void {
   const S = CONFIG.scoring
+
+  // overdue boarding planes bleed score continuously — "the score keeps dropping"
+  for (const plane of state.planes) {
+    if (plane.state === 'boarding' && plane.gateDelaySeconds > 0) {
+      state.stats.score -= S.overdueDripPerSecond * dt
+    }
+  }
+
   for (const event of state.events) {
     switch (event.type) {
       case 'landed': {
@@ -25,6 +33,7 @@ export function applyScoring(state: GameState): void {
         const kindMult = event.plane.kind === 'vip' ? CONFIG.events.vip.scoreMult : 1
         state.stats.score += Math.round(S.departBase * frac * kindMult)
         state.stats.departed++
+        // D:00 — on time iff it left the gate within the departure window
         if (event.delaySeconds <= S.onTimeThresholdSeconds) {
           state.stats.score += S.onTimeBonus
           state.stats.departedOnTime++
@@ -49,6 +58,9 @@ export function applyScoring(state: GameState): void {
         state.streak = 0
         break
       }
+      case 'fuel_out':
+        state.stats.gameOverCallsign = event.plane.callsign
+        break
       case 'near_miss': {
         state.streak++
         state.stats.nearMisses++

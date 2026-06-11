@@ -1,3 +1,5 @@
+export type PlaneSize = 'small' | 'large'
+
 // Event definitions are data: an event is a combination of effect primitives.
 // Adding an event = adding a def below. New primitive = code in systems/events.ts.
 export type EventEffect =
@@ -79,14 +81,17 @@ export const CONFIG = {
 
   shift: {
     durationSeconds: 300,
-    // [timeSeconds, planesPerMinute] — piecewise linear spawn curve
+    largeProbability: 0.35,    // share of spawns that are wide-body (seeded roll)
+    // [timeSeconds, planesPerMinute] — piecewise linear spawn curve.
+    // Capacity-aware: with 60s/120s circling budgets and a single large strip,
+    // sustained demand beyond ~8/min makes perfect play impossible.
     spawnCurve: [
-      [0, 5],
-      [60, 7],
-      [120, 9],
-      [180, 11],
-      [240, 12],
-      [300, 12],
+      [0, 4],
+      [60, 5],
+      [120, 6],
+      [180, 7],
+      [240, 8],
+      [300, 8],
     ] as [number, number][],
   },
 
@@ -96,15 +101,17 @@ export const CONFIG = {
     takeoffSeconds: 6,         // runway occupancy for a departure roll
     holdShortOffsetPixels: 26, // departure wait point, offset from threshold
     lengthPixels: 150,
-    widthPixels: 24,
+    widths: { small: 20, large: 28 }, // wide-body strips are visibly wider
     tapPaddingPixels: 14,      // extra hit-test margin
     // runway positions in logical canvas coords; index 2 is the Third Runway perk.
     // The V-terminal owns the bottom of the field, so runways sit mid-field.
+    // Large planes can only use large runways; index 0 is large so every
+    // difficulty (including hard's single strip) can serve both classes.
     positions: [
-      { x: 320, y: 330, angle: -15 },
-      { x: 640, y: 330, angle: 15 },
-      { x: 480, y: 272, angle: 0 },
-    ],
+      { x: 320, y: 330, angle: -15, size: 'large' },
+      { x: 640, y: 330, angle: 15, size: 'small' },
+      { x: 480, y: 272, angle: 0, size: 'large' },
+    ] as { x: number; y: number; angle: number; size: PlaneSize }[],
   },
 
   gate: {
@@ -133,7 +140,7 @@ export const CONFIG = {
     holdingRadiusStep: 16,     // each additional plane expands radius by this
     orbitSpeedDegreesPerSecond: 26,
     spawnEdgeMarginPixels: 40, // spawn offset from screen edges
-    fuelJitter: 10,            // initial fuel varies +/- this amount
+    fuelJitter: 15,            // max % of circling budget a flight arrives short
   },
 
   plane: {
@@ -141,11 +148,14 @@ export const CONFIG = {
     landingSpeedPixelsPerSecond: 110,
     taxiSpeedPixelsPerSecond: 40,
     climbOutSpeedPixelsPerSecond: 140,
-    initialFuel: 80,           // out of 100
-    fuelDrainPerSecond: 0.4,   // while holding/approaching
+    // size classes: small goes anywhere; large needs large runways/gates
+    sizes: {
+      small: { fuelSeconds: 60, visualScale: 0.85 },  // circling budget
+      large: { fuelSeconds: 120, visualScale: 1.25 },
+    },
+    initialFuel: 100,          // % of the size's circling budget
     initialPatience: 100,      // out of 100
     patienceDrainPerSecond: 0.3, // while waiting (holding, stuck, boarding)
-    scheduleSlackSeconds: 110, // deadline = spawnTime + this; delay measured from it
     hitRadiusPixels: 26,
     // Visual size
     width: 28,
@@ -165,8 +175,8 @@ export const CONFIG = {
     eventSlowMoFactor: 0.05,   // timeScale while the dialog is open
     riskLotterySize: 64,       // pre-rolled floats for go-around checks
     medical: {
-      landWithinSeconds: 45,
-      fuelDrainMult: 3,
+      landWithinSeconds: 40,
+      fuelDrainMult: 1, // the deadline is the pressure; extra drain would always game-over first
       divertPenaltyMult: 3,
       onTimeLandBonus: 200,
     },
@@ -367,9 +377,10 @@ export const CONFIG = {
     landingBase: 40,                 // landing pays small, scaled by patience
     departBase: 140,                 // departure pays big, scaled down by delay
     minLandingFraction: 0.2,         // payouts floor at this fraction
-    onTimeBonus: 100,                // extra when delay <= onTimeThresholdSeconds
-    onTimeThresholdSeconds: 20,
+    onTimeBonus: 100,                // extra when the gate departure window is met
+    onTimeThresholdSeconds: 0,       // D:00 — any overdue second counts as delayed
     lateMultiplierPerSecond: 0.005,  // departure payout reduction per second late
+    overdueDripPerSecond: 2,         // score bleed while a boarding plane sits overdue
     ragePenalty: 150,                // patience hit zero (fires once per plane)
     nearMissBonus: 25,
     streakMultiplierStep: 0.1,       // each consecutive near-miss adds 0.1x

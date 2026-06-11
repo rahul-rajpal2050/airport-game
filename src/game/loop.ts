@@ -50,7 +50,7 @@ export function startShift(seed: number | string, options?: ShiftOptions): void 
   )
   state.runways = CONFIG.runway.positions
     .slice(0, runwayCount)
-    .map((p, i) => new Runway(i, p.x, p.y, p.angle))
+    .map((p, i) => new Runway(i, p.x, p.y, p.angle, p.size))
   for (const closedId of archetype?.closedRunways ?? []) {
     const runway = state.runways[closedId]
     if (runway) runway.closedUntil = Infinity
@@ -92,6 +92,10 @@ export function returnToMenu(): void {
 
 function update(dt: number): void {
   if (state.shakeMs > 0) state.shakeMs = Math.max(0, state.shakeMs - dt * 1000)
+  if (state.warning) {
+    state.warning.msLeft -= dt * 1000
+    if (state.warning.msLeft <= 0) state.warning = null
+  }
   if (state.phase !== 'active') return
 
   const prevPending = state.pendingEvent

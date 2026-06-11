@@ -1,4 +1,4 @@
-import { CONFIG } from '../../config'
+import { CONFIG, type PlaneSize } from '../../config'
 import type { RNG } from '../../utils/rng'
 import { Plane } from '../entities/plane'
 import type { GameState } from '../state'
@@ -9,6 +9,7 @@ export interface SpawnEntry {
   y: number
   callsign: string
   fuel: number
+  size: PlaneSize
 }
 
 /** Piecewise-linear lookup of planes-per-minute at time t */
@@ -61,7 +62,9 @@ export function generateSchedule(rng: RNG, rateMult = 1): SpawnEntry[] {
       x: pos.x,
       y: pos.y,
       callsign: rollCallsign(rng),
-      fuel: CONFIG.plane.initialFuel + rng.int(-CONFIG.approach.fuelJitter, CONFIG.approach.fuelJitter),
+      // fuel is a % of the size's circling budget; some flights arrive short
+      fuel: CONFIG.plane.initialFuel - rng.int(0, CONFIG.approach.fuelJitter),
+      size: rng.next() < CONFIG.shift.largeProbability ? 'large' : 'small',
     })
   }
   return entries
@@ -80,7 +83,7 @@ export function updateSpawns(state: GameState): void {
     state.schedule[state.scheduleIndex].time <= state.shiftTime
   ) {
     const e = state.schedule[state.scheduleIndex++]
-    const plane = new Plane(nextPlaneId++, e.callsign, e.x, e.y, e.fuel, e.time)
+    const plane = new Plane(nextPlaneId++, e.callsign, e.x, e.y, e.fuel, e.time, e.size)
     if (state.nextSpawnKind !== null) {
       plane.kind = state.nextSpawnKind
       state.nextSpawnKind = null

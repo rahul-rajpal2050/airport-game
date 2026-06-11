@@ -56,8 +56,8 @@ export function simulate(state: GameState, dt: number): boolean {
   // 5. runway sequencing
   for (const runway of state.runways) runway.sequence(state.shiftTime)
 
-  // 6. scoring consumes events
-  applyScoring(state)
+  // 6. scoring consumes events (and the overdue drip)
+  applyScoring(state, dt)
 
   // 7. hand events to the juice layer (loop-side: sound/shake), start fresh
   state.juiceEvents = state.events
@@ -66,5 +66,7 @@ export function simulate(state: GameState, dt: number): boolean {
   // 8. sweep finished planes
   state.planes = state.planes.filter((p) => p.state !== 'departed' && p.state !== 'diverted')
 
+  // a plane running dry while circling ends the shift on the spot
+  if (state.stats.gameOverCallsign) return true
   return state.shiftTime >= CONFIG.shift.durationSeconds
 }

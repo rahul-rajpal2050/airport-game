@@ -1,5 +1,8 @@
 import { CONFIG } from '../config'
+import { playBuzz } from './juice/audio'
 import type { GameState } from './state'
+
+const WARNING_MS = 2200
 
 export function attachInput(canvas: HTMLCanvasElement, getState: () => GameState): () => void {
   function onPointerDown(e: PointerEvent): void {
@@ -32,6 +35,11 @@ export function attachInput(canvas: HTMLCanvasElement, getState: () => GameState
     if (selected?.isAirborneControllable || selected?.state === 'boarding') {
       for (const runway of state.runways) {
         if (runway.containsPoint(lx, ly)) {
+          if (!runway.canAccept(selected)) {
+            state.warning = { text: `${selected.callsign} needs a LARGE runway`, msLeft: WARNING_MS }
+            playBuzz()
+            return // keep the selection so the player can pick a valid strip
+          }
           runway.enqueue(selected)
           state.selectedPlaneId = null
           return
@@ -46,6 +54,11 @@ export function attachInput(canvas: HTMLCanvasElement, getState: () => GameState
     ) {
       for (const gate of state.gates) {
         if (gate.containsPoint(lx, ly) && gate.free) {
+          if (!gate.canAccept(selected)) {
+            state.warning = { text: `${selected.callsign} needs a LARGE gate`, msLeft: WARNING_MS }
+            playBuzz()
+            return
+          }
           gate.reserve(selected)
           state.selectedPlaneId = null
           return

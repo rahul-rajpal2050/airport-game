@@ -1,4 +1,4 @@
-import { CONFIG } from '../../config'
+import { CONFIG, type PlaneSize } from '../../config'
 import type { Plane } from './plane'
 
 const DEG = Math.PI / 180
@@ -8,19 +8,30 @@ export class Runway {
   readonly x: number
   readonly y: number
   readonly angle: number // degrees
+  readonly size: PlaneSize
   queue: Plane[] = []
   current: Plane | null = null
   closedUntil = 0 // shiftTime; sequence() won't commit while closed
 
-  constructor(id: number, x: number, y: number, angle: number) {
+  constructor(id: number, x: number, y: number, angle: number, size: PlaneSize = 'large') {
     this.id = id
     this.x = x
     this.y = y
     this.angle = angle
+    this.size = size
   }
 
   get free(): boolean {
     return this.current === null
+  }
+
+  get width(): number {
+    return CONFIG.runway.widths[this.size]
+  }
+
+  /** Small planes go anywhere; large planes need a large strip */
+  canAccept(plane: Plane): boolean {
+    return this.size === 'large' || plane.size === 'small'
   }
 
   /** Threshold (touchdown point) and far end, in logical coords */
@@ -37,7 +48,7 @@ export class Runway {
   /** Where a departure waits for clearance: beside the threshold */
   holdShortPoint(): { x: number; y: number } {
     const { threshold } = this.geometry()
-    const off = CONFIG.runway.widthPixels / 2 + CONFIG.runway.holdShortOffsetPixels
+    const off = this.width / 2 + CONFIG.runway.holdShortOffsetPixels
     const perpX = -Math.sin(this.angle * DEG)
     const perpY = Math.cos(this.angle * DEG)
     return { x: threshold.x + perpX * off, y: threshold.y + perpY * off }
@@ -45,6 +56,7 @@ export class Runway {
 
   /** Mixed arrival/departure queue. A boarding plane starts taxiing out immediately. */
   enqueue(plane: Plane): void {
+    if (!this.canAccept(plane)) return // size rules are enforced here, warned in input
     if (this.queue.includes(plane)) return
     plane.assignedRunway?.removeFromQueue(plane)
     plane.assignedRunway = this
@@ -90,7 +102,7 @@ export class Runway {
   containsPoint(px: number, py: number): boolean {
     const pad = CONFIG.runway.tapPaddingPixels
     const halfL = CONFIG.runway.lengthPixels / 2 + pad
-    const halfW = CONFIG.runway.widthPixels / 2 + pad
+    const halfW = this.width / 2 + pad
     const cos = Math.cos(-this.angle * DEG)
     const sin = Math.sin(-this.angle * DEG)
     const lx = (px - this.x) * cos - (py - this.y) * sin

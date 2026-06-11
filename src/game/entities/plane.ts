@@ -1,6 +1,8 @@
-import { CONFIG } from '../../config'
+import { CONFIG, type PlaneSize } from '../../config'
 import type { Gate } from './gate'
 import type { Runway } from './runway'
+
+export type { PlaneSize }
 
 export type PlaneState =
   | 'approaching'
@@ -30,7 +32,7 @@ const ALLOWED: Partial<Record<PlaneState, PlaneState[]>> = {
 }
 
 export type FrameEvent =
-  | { type: 'spawned' | 'landed' | 'diverted' | 'raged' | 'boarding_ready' | 'go_around'; plane: Plane }
+  | { type: 'spawned' | 'landed' | 'diverted' | 'raged' | 'boarding_ready' | 'go_around' | 'fuel_out'; plane: Plane }
   | { type: 'departed_ok'; plane: Plane; delaySeconds: number }
   | { type: 'near_miss'; a: Plane; b: Plane }
   | { type: 'event_fired'; defId: string }
@@ -69,7 +71,7 @@ const OFFSCREEN_MARGIN = 40
 export class Plane {
   readonly id: number
   readonly callsign: string
-  readonly deadline: number // shiftTime by which passengers expect wheels-up
+  readonly size: PlaneSize
   x: number
   y: number
   heading = 0 // radians
@@ -88,19 +90,31 @@ export class Plane {
   rolloutDone = false
   atHoldShort = false
   wheelsUp = false
+  /** set when turnaround completes; departure window counts from here */
+  boardingStart: number | null = null
+  /** seconds past the departure window, frozen once the plane leaves the gate */
+  gateDelaySeconds = 0
   private rollElapsed = 0
   private rollFrom = { x: 0, y: 0 }
   private rollTo = { x: 0, y: 0 }
   private taxiTarget = { x: 0, y: 0 }
   private gateTimer = 0
 
-  constructor(id: number, callsign: string, x: number, y: number, fuel: number, spawnTime: number) {
+  constructor(
+    id: number,
+    callsign: string,
+    x: number,
+    y: number,
+    fuel: number,
+    _spawnTime: number,
+    size: PlaneSize = 'small'
+  ) {
     this.id = id
     this.callsign = callsign
     this.x = x
     this.y = y
     this.fuel = fuel
-    this.deadline = spawnTime + CONFIG.plane.scheduleSlackSeconds
+    this.size = size
     const { holdingCenterX, holdingCenterY } = CONFIG.approach
     this.heading = Math.atan2(holdingCenterY - y, holdingCenterX - x)
   }
@@ -192,7 +206,17 @@ export class Plane {
         this.gateTimer += dt
         if (this.gateTimer >= CONFIG.gate.turnaroundSeconds * ctx.turnaroundMult) {
           this.transition('boarding')
+          this.boardingStart = ctx.shiftTime
           ctx.events.push({ type: 'boarding_ready', plane: this })
+        }
+        break
+      case 'boarding':
+        // departure window countdown; overdue seconds drive D:00 and the score drip
+        if (this.boardingStart !== null) {
+          this.gateDelaySeconds = Math.max(
+            0,
+            ctx.shiftTime - this.boardingStart - CONFIG.gate.departWindowSeconds
+          )
         }
         break
       case 'taxiing_out':
@@ -216,20 +240,21 @@ export class Plane {
     }
   }
 
+  /** Fuel is a circling budget: 100% lasts sizes[size].fuelSeconds of holding. Empty = game over. */
   private drainFuel(dt: number, ctx: UpdateContext): boolean {
     const mult = ctx.fuelMult * (this.kind === 'medical' ? CONFIG.events.medical.fuelDrainMult : 1)
-    this.fuel -= CONFIG.plane.fuelDrainPerSecond * mult * dt
+    const ratePerSecond = CONFIG.plane.initialFuel / CONFIG.plane.sizes[this.size].fuelSeconds
+    this.fuel -= ratePerSecond * mult * dt
     if (this.fuel <= 0) {
       this.fuel = 0
-      this.transition('diverted')
-      ctx.events.push({ type: 'diverted', plane: this })
+      ctx.events.push({ type: 'fuel_out', plane: this })
       return true
     }
     return false
   }
 
   private updateApproaching(dt: number, ctx: UpdateContext): void {
-    if (this.drainFuel(dt, ctx)) return
+    // fuel only burns while circling — the approach itself is free
     const { holdingCenterX: cx, holdingCenterY: cy } = CONFIG.approach
     const dx = cx - this.x
     const dy = cy - this.y
@@ -333,8 +358,8 @@ export class Plane {
       this.y = this.rollFrom.y + (this.rollTo.y - this.rollFrom.y) * ease
       if (t >= 1) {
         this.wheelsUp = true
-        const delay = Math.max(0, ctx.shiftTime - this.deadline)
-        ctx.events.push({ type: 'departed_ok', plane: this, delaySeconds: delay })
+        // delay = how long it sat at the gate past the departure window
+        ctx.events.push({ type: 'departed_ok', plane: this, delaySeconds: this.gateDelaySeconds })
       }
       return
     }

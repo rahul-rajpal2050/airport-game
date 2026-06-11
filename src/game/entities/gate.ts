@@ -1,4 +1,4 @@
-import { CONFIG } from '../../config'
+import { CONFIG, type PlaneSize } from '../../config'
 import type { Plane } from './plane'
 
 const DEG = Math.PI / 180
@@ -7,6 +7,7 @@ export class Gate {
   readonly id: number
   readonly x: number
   readonly y: number
+  readonly size: PlaneSize
   reservedBy: Plane | null = null
 
   constructor(id: number) {
@@ -19,10 +20,20 @@ export class Gate {
     const dist = G.armStartOffset + step * G.spacingPixels
     this.x = G.apexX + arm * Math.cos(a) * dist
     this.y = G.apexY - Math.sin(a) * dist
+    this.size = id % G.largeEvery === 0 ? 'large' : 'small'
   }
 
   get free(): boolean {
     return this.reservedBy === null
+  }
+
+  get boxSize(): number {
+    return this.size === 'large' ? CONFIG.gate.largeSizePixels : CONFIG.gate.sizePixels
+  }
+
+  /** Small planes park anywhere; large planes need a large gate */
+  canAccept(plane: Plane): boolean {
+    return this.size === 'large' || plane.size === 'small'
   }
 
   /** Occupied = plane physically at the gate (vs merely reserved by an inbound) */
@@ -32,6 +43,7 @@ export class Gate {
   }
 
   reserve(plane: Plane): void {
+    if (!this.canAccept(plane)) return // size rules enforced here, warned in input
     if (plane.assignedGate === this) return
     if (this.reservedBy && this.reservedBy !== plane) this.release()
     plane.assignedGate?.release()
@@ -45,7 +57,7 @@ export class Gate {
   }
 
   containsPoint(px: number, py: number): boolean {
-    const half = CONFIG.gate.sizePixels / 2 + CONFIG.gate.tapPaddingPixels
+    const half = this.boxSize / 2 + CONFIG.gate.tapPaddingPixels
     return Math.abs(px - this.x) <= half && Math.abs(py - this.y) <= half
   }
 }

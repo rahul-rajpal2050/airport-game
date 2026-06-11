@@ -45,6 +45,10 @@ export function applyJuice(state: GameState): void {
         playWhoosh()
         shake(state, J.nearMissShakeIntensity, J.nearMissShakeMs)
         break
+      case 'fuel_out':
+        playAlarm()
+        shake(state, J.divertShakeIntensity, J.divertShakeMs)
+        break
     }
   }
   state.juiceEvents = []

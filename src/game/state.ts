@@ -20,6 +20,8 @@ export interface ShiftStats {
   longestHoldCallsign: string
   worstDelaySeconds: number
   worstDelayCallsign: string
+  /** set when a plane ran dry circling — the shift ends immediately */
+  gameOverCallsign: string
   score: number
 }
 
@@ -70,6 +72,8 @@ export interface GameState {
   hudReputation: number | null
   /** settings toggle: near-miss detection (slow-mo, streaks) */
   nearMissesEnabled: boolean
+  /** transient HUD warning (size-rule violations); msLeft ticks on wall-clock */
+  warning: { text: string; msLeft: number } | null
 }
 
 export function newGameState(seed: number | string): GameState {
@@ -105,6 +109,7 @@ export function newGameState(seed: number | string): GameState {
     modifiers: identityModifiers(),
     hudReputation: null,
     nearMissesEnabled: true,
+    warning: null,
   }
 }
 
@@ -122,6 +127,7 @@ export function newStats(): ShiftStats {
     longestHoldCallsign: '',
     worstDelaySeconds: 0,
     worstDelayCallsign: '',
+    gameOverCallsign: '',
     score: 0,
   }
 }
