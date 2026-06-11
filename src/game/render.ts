@@ -7,8 +7,25 @@ import { upcomingEvent } from './systems/events'
 
 const DEG = Math.PI / 180
 
+// Jet silhouette, nose toward +x. Drawn at a 36px length baseline, scaled from config.
+// Built lazily: Path2D only exists in the browser, and headless tests import this module.
+const PLANE_PATH_D =
+  'M 18 0 L 12 -3 L 3 -3 L -5 -14 L -8 -14 L -3 -3 L -12 -2.5 L -17 -8 L -19 -8 L -16.5 -2 L -18 0 ' +
+  'L -16.5 2 L -19 8 L -17 8 L -12 2.5 L -3 3 L -8 14 L -5 14 L 3 3 L 12 3 Z'
+let planePath: Path2D | null = null
+function getPlanePath(): Path2D {
+  if (!planePath) planePath = new Path2D(PLANE_PATH_D)
+  return planePath
+}
+const PLANE_BASELINE_WIDTH = 28
+
 const COLORS = {
   bg: '#0a0e1a',
+  bgGradientTop: '#0b101f',
+  bgGradientBottom: '#16203a',
+  apron: 'rgba(30, 41, 66, 0.45)',
+  apronEdge: 'rgba(74, 85, 104, 0.35)',
+  shadow: 'rgba(0, 0, 0, 0.35)',
   runway: '#2a3142',
   runwayStripe: '#4a5568',
   terminal: '#1a2030',
@@ -32,10 +49,38 @@ const COLORS = {
   barBg: 'rgba(148, 163, 184, 0.25)',
 } as const
 
+let bgGradient: CanvasGradient | null = null
+let vignette: CanvasGradient | null = null
+
+function drawBackground(ctx: CanvasRenderingContext2D): void {
+  const { width, height } = CONFIG.canvas
+  if (!bgGradient) {
+    bgGradient = ctx.createLinearGradient(0, 0, 0, height)
+    bgGradient.addColorStop(0, COLORS.bgGradientTop)
+    bgGradient.addColorStop(1, COLORS.bgGradientBottom)
+    vignette = ctx.createRadialGradient(width / 2, height / 2, height * 0.35, width / 2, height / 2, width * 0.75)
+    vignette.addColorStop(0, 'rgba(0,0,0,0)')
+    vignette.addColorStop(1, 'rgba(0,0,0,0.4)')
+  }
+  ctx.fillStyle = bgGradient
+  ctx.fillRect(0, 0, width, height)
+
+  // apron: the paved field around runways and terminal
+  ctx.fillStyle = COLORS.apron
+  ctx.strokeStyle = COLORS.apronEdge
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.roundRect(220, 350, 520, 240, 18)
+  ctx.fill()
+  ctx.stroke()
+
+  ctx.fillStyle = vignette!
+  ctx.fillRect(0, 0, width, height)
+}
+
 export function draw(ctx: CanvasRenderingContext2D, state: GameState): void {
   const { width, height } = CONFIG.canvas
-  ctx.fillStyle = COLORS.bg
-  ctx.fillRect(0, 0, width, height)
+  drawBackground(ctx)
 
   if (state.phase === 'pre_shift') return // React menu covers the canvas
 
@@ -218,12 +263,31 @@ function drawPlane(ctx: CanvasRenderingContext2D, plane: Plane, selected: boolea
     ctx.stroke()
   }
 
+  ctx.restore()
+
+  const scale = CONFIG.plane.width / PLANE_BASELINE_WIDTH
+  const airborne =
+    plane.isAirborneControllable ||
+    plane.state === 'landing' ||
+    (plane.state === 'departing' && plane.wheelsUp)
+
+  // drop shadow: offset grows with altitude — the cheap depth cue
+  const shadowDx = airborne ? 5 : 2
+  const shadowDy = airborne ? 8 : 3
+  ctx.save()
+  ctx.translate(plane.x + shadowDx, plane.y + shadowDy)
   ctx.rotate(plane.heading)
+  ctx.scale(scale, scale)
+  ctx.fillStyle = COLORS.shadow
+  ctx.fill(getPlanePath())
+  ctx.restore()
+
+  ctx.save()
+  ctx.translate(plane.x, plane.y)
+  ctx.rotate(plane.heading)
+  ctx.scale(scale, scale)
   ctx.fillStyle = planeColor(plane, shiftTime)
-  ctx.fillRect(-w / 2, -h / 2, w, h)
-  // nose marker so heading is readable
-  ctx.fillStyle = COLORS.bg
-  ctx.fillRect(w / 2 - 5, -2, 3, 4)
+  ctx.fill(getPlanePath())
   ctx.restore()
 
   // callsign + fuel bar (airborne)
