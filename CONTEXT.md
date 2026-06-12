@@ -81,6 +81,13 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
 
 ## Recent Changes
+[2026-06-12] Player-facing batch: first-start tutorial offer (5 slides + HOW TO
+PLAY reopen), layered realistic sounds (3s jet-spool takeoff, tire screech, radio
+blips on spawn), rush-hour group arrivals (30% formation waves, rate-compensated,
+deterministic), and Phase 5 scaffolding: Supabase leaderboard client (plain fetch),
+DAILY CHALLENGE menu mode (dailySeed), score submission UI, write-only suggestion
+box. Backend UI hidden until CONFIG.backend gets the project URL + anon key —
+SQL in supabase-setup.sql. 90 tests passing. NO DEPLOYS without Rahul's say-so.
 [2026-06-12] Satisfaction scoring: headline score is passenger satisfaction %
 (weighted A:00/D:00 minus complaints). A:00 = landed within 75s of spawn. HUD
 top-right shows satisfaction + ops score; center shows both KPIs; score screen
