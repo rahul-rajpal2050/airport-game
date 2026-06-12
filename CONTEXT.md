@@ -81,6 +81,11 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
 
 ## Recent Changes
+[2026-06-12] Satisfaction scoring: headline score is passenger satisfaction %
+(weighted A:00/D:00 minus complaints). A:00 = landed within 75s of spawn. HUD
+top-right shows satisfaction + ops score; center shows both KPIs; score screen
+leads with SATISFACTION %. Points remain as ops score feeding campaign economy.
+satisfactionOf() pure function in scoring.ts. 85 tests passing.
 [2026-06-12] 24h clock (06:00-22:00 over the shift, replaces countdown), rush-hour
 spawn waves authored in clock hours (four plateaus, evening hardest), day/night
 palette keyframes with dawn/dusk lerp, runway edge lights after dark, apron dimming.

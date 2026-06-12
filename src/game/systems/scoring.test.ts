@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import { CONFIG } from '../../config'
 import { Plane } from '../entities/plane'
-import { newGameState, type GameState } from '../state'
-import { applyScoring } from './scoring'
+import { newGameState, newStats, type GameState } from '../state'
+import { applyScoring, satisfactionOf } from './scoring'
 
 function makeState(): GameState {
   const state = newGameState(1)
@@ -15,6 +15,52 @@ function makePlane(): Plane {
 }
 
 const S = CONFIG.scoring
+
+describe('satisfactionOf', () => {
+  it('perfect punctuality with no complaints is 100', () => {
+    const stats = newStats()
+    stats.landed = 10
+    stats.arrivedOnTime = 10
+    stats.departed = 8
+    stats.departedOnTime = 8
+    expect(satisfactionOf(stats)).toBe(100)
+  })
+
+  it('no data yet is neutral, not zero', () => {
+    expect(satisfactionOf(newStats())).toBe(100)
+  })
+
+  it('weights departures heavier than arrivals', () => {
+    const Sat = CONFIG.satisfaction
+    const lateArrivals = newStats()
+    lateArrivals.landed = 10
+    lateArrivals.arrivedOnTime = 0
+    lateArrivals.departed = 10
+    lateArrivals.departedOnTime = 10
+    const lateDepartures = newStats()
+    lateDepartures.landed = 10
+    lateDepartures.arrivedOnTime = 10
+    lateDepartures.departed = 10
+    lateDepartures.departedOnTime = 0
+    expect(satisfactionOf(lateArrivals)).toBe(Math.round(100 * Sat.weightDepartures))
+    expect(satisfactionOf(lateDepartures)).toBe(Math.round(100 * Sat.weightArrivals))
+    expect(satisfactionOf(lateDepartures)).toBeLessThan(satisfactionOf(lateArrivals))
+  })
+
+  it('complaints subtract and the result clamps at zero', () => {
+    const stats = newStats()
+    stats.landed = 4
+    stats.arrivedOnTime = 4
+    stats.departed = 4
+    stats.departedOnTime = 4
+    stats.raged = 2
+    stats.diverted = 1
+    expect(satisfactionOf(stats)).toBe(100 - 3 * CONFIG.satisfaction.complaintPenalty)
+
+    stats.raged = 50
+    expect(satisfactionOf(stats)).toBe(0)
+  })
+})
 
 describe('applyScoring', () => {
   it('full patience landing pays the full landing base', () => {
@@ -86,6 +132,22 @@ describe('applyScoring', () => {
     applyScoring(state)
     expect(state.streak).toBe(0)
     expect(state.stats.bestStreak).toBe(4)
+  })
+
+  it('counts A:00 for landings within the arrival window, not late ones', () => {
+    const state = makeState()
+    const prompt = new Plane(1, 'OT100', 0, 0, 100, 10) // spawned at 10s
+    const late = new Plane(2, 'LT200', 0, 0, 100, 10)
+    state.shiftTime = 10 + CONFIG.satisfaction.arrivalWindowSeconds - 1
+    state.events.push({ type: 'landed', plane: prompt })
+    applyScoring(state, 0)
+    expect(state.stats.arrivedOnTime).toBe(1)
+
+    state.shiftTime = 10 + CONFIG.satisfaction.arrivalWindowSeconds + 30
+    state.events = [{ type: 'landed', plane: late }]
+    applyScoring(state, 0)
+    expect(state.stats.arrivedOnTime).toBe(1) // unchanged
+    expect(state.stats.landed).toBe(2)
   })
 
   it('tracks the longest hold across landed and diverted planes', () => {

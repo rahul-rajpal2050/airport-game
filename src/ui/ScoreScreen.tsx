@@ -1,12 +1,21 @@
 import { getState } from '../game/loop'
 import { advance, getUi, isCampaignActive, startFreeShift } from '../game/meta/campaign'
+import { satisfactionOf } from '../game/systems/scoring'
 import { buttonStyle, overlayStyle } from './overlay'
+
+function satisfactionColor(pct: number): string {
+  if (pct >= 90) return '#4ade80'
+  if (pct >= 70) return '#facc15'
+  return '#ef4444'
+}
 
 export function ScoreScreen() {
   const { stats, seed } = getState()
   const campaign = isCampaignActive() ? getUi() : null
 
   const gameOver = stats.gameOverCallsign !== ''
+  const satisfaction = satisfactionOf(stats)
+  const complaints = stats.raged + stats.diverted
   return (
     <div style={overlayStyle}>
       {gameOver ? (
@@ -17,20 +26,32 @@ export function ScoreScreen() {
           </div>
         </>
       ) : (
-        <h2 style={{ fontSize: 22, margin: 0, color: '#94a3b8' }}>SHIFT COMPLETE</h2>
+        <h2 style={{ fontSize: 22, margin: 0, color: '#94a3b8' }}>SATISFACTION</h2>
       )}
-      <div style={{ fontSize: 48, fontWeight: 'bold' }}>{Math.round(stats.score)}</div>
+      <div style={{ fontSize: 52, fontWeight: 'bold', color: satisfactionColor(satisfaction) }}>
+        {satisfaction}%
+      </div>
       <div style={{ lineHeight: 2, fontSize: 15 }}>
         {stats.departed > 0 && (
           <div style={{ fontWeight: 'bold', color: '#4ade80' }}>
             D:00 {Math.round((100 * stats.departedOnTime) / stats.departed)}% —{' '}
-            {stats.departedOnTime}/{stats.departed} on time
+            {stats.departedOnTime}/{stats.departed} departures on time
           </div>
         )}
-        <div>
-          {stats.departed} departed{stats.departed > 0 && ` — ${stats.departedOnTime} on time`}
+        {stats.landed > 0 && (
+          <div style={{ fontWeight: 'bold', color: '#4ade80' }}>
+            A:00 {Math.round((100 * stats.arrivedOnTime) / stats.landed)}% —{' '}
+            {stats.arrivedOnTime}/{stats.landed} arrivals on time
+          </div>
+        )}
+        {complaints > 0 && (
+          <div style={{ color: '#ef4444' }}>
+            {complaints} customer complaint{complaints === 1 ? '' : 's'}
+          </div>
+        )}
+        <div style={{ color: '#94a3b8' }}>
+          ops score {Math.round(stats.score)} — {stats.departed} departed, {stats.landed} landed
         </div>
-        <div style={{ color: '#94a3b8' }}>{stats.landed} landed</div>
         {stats.nearMisses > 0 && (
           <div style={{ color: '#4ade80' }}>
             {stats.nearMisses} near-misses — best streak x{stats.bestStreak}

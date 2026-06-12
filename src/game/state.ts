@@ -9,6 +9,7 @@ export type ShiftPhase = 'pre_shift' | 'active' | 'post_shift'
 
 export interface ShiftStats {
   landed: number
+  arrivedOnTime: number
   departed: number
   departedOnTime: number
   diverted: number
@@ -116,6 +117,7 @@ export function newGameState(seed: number | string): GameState {
 export function newStats(): ShiftStats {
   return {
     landed: 0,
+    arrivedOnTime: 0,
     departed: 0,
     departedOnTime: 0,
     diverted: 0,

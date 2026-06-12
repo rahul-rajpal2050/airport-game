@@ -1,5 +1,19 @@
 import { CONFIG } from '../../config'
-import type { GameState } from '../state'
+import type { GameState, ShiftStats } from '../state'
+
+/**
+ * The headline score: passenger satisfaction, 0-100.
+ * Weighted blend of the two punctuality KPIs minus complaints (rage + diversions).
+ * Components without data yet are neutral - a 30-second shift isn't 0% satisfied.
+ */
+export function satisfactionOf(stats: ShiftStats): number {
+  const S = CONFIG.satisfaction
+  const a00 = stats.landed > 0 ? stats.arrivedOnTime / stats.landed : 1
+  const d00 = stats.departed > 0 ? stats.departedOnTime / stats.departed : 1
+  const complaints = stats.raged + stats.diverted
+  const raw = 100 * (S.weightArrivals * a00 + S.weightDepartures * d00) - S.complaintPenalty * complaints
+  return Math.max(0, Math.min(100, Math.round(raw)))
+}
 
 /** Consume this frame's events into score and stats (sim hands them to juice after) */
 export function applyScoring(state: GameState, dt: number): void {
@@ -15,6 +29,10 @@ export function applyScoring(state: GameState, dt: number): void {
   for (const event of state.events) {
     switch (event.type) {
       case 'landed': {
+        // A:00 - on time iff it touched down within the scheduled arrival window
+        if (state.shiftTime <= event.plane.spawnTime + CONFIG.satisfaction.arrivalWindowSeconds) {
+          state.stats.arrivedOnTime++
+        }
         const frac = Math.max(event.plane.patience / CONFIG.plane.initialPatience, S.minLandingFraction)
         const kindMult = event.plane.kind === 'vip' ? CONFIG.events.vip.scoreMult : 1
         state.stats.score += Math.round(S.landingBase * frac * kindMult)

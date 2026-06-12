@@ -4,6 +4,7 @@ import type { Plane } from './entities/plane'
 import type { Runway } from './entities/runway'
 import type { GameState } from './state'
 import { upcomingEvent } from './systems/events'
+import { satisfactionOf } from './systems/scoring'
 
 const DEG = Math.PI / 180
 
@@ -410,6 +411,12 @@ function drawPlane(ctx: CanvasRenderingContext2D, plane: Plane, selected: boolea
   }
 }
 
+function satisfactionColor(pct: number): string {
+  if (pct >= 90) return COLORS.fuelGreen
+  if (pct >= 70) return COLORS.planeWarning
+  return COLORS.planeCritical
+}
+
 /** green above half, yellow above a quarter, red below — fraction in [0,1] */
 function fuelColor(fraction: number): string {
   if (fraction > 0.5) return COLORS.fuelGreen
@@ -440,9 +447,14 @@ function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
   ctx.textAlign = 'left'
   ctx.fillText(`${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`, pad, pad + 16)
 
+  // headline score: passenger satisfaction; ops points beneath it
+  const satisfaction = satisfactionOf(state.stats)
   ctx.textAlign = 'right'
-  ctx.fillStyle = COLORS.hudBright
-  ctx.fillText(String(state.stats.score), width - pad, pad + 16)
+  ctx.fillStyle = satisfactionColor(satisfaction)
+  ctx.fillText(`${satisfaction}%`, width - pad, pad + 16)
+  ctx.font = `${CONFIG.ui.hudFontSize - 2}px monospace`
+  ctx.fillStyle = COLORS.hud
+  ctx.fillText(String(Math.round(state.stats.score)), width - pad, pad + 32)
 
   const airborne = state.planes.filter((p) => p.isAirborneControllable).length
   ctx.font = `${CONFIG.ui.hudFontSize}px monospace`
@@ -452,7 +464,11 @@ function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
     state.stats.departed > 0
       ? ` · D:00 ${Math.round((100 * state.stats.departedOnTime) / state.stats.departed)}%`
       : ''
-  ctx.fillText(`${airborne} inbound${d00}`, width / 2, pad + 16)
+  const a00 =
+    state.stats.landed > 0
+      ? ` · A:00 ${Math.round((100 * state.stats.arrivedOnTime) / state.stats.landed)}%`
+      : ''
+  ctx.fillText(`${airborne} inbound${d00}${a00}`, width / 2, pad + 16)
 
   if (state.warning) {
     ctx.fillStyle = COLORS.planeWarning

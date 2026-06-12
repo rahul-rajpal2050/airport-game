@@ -72,6 +72,7 @@ export class Plane {
   readonly id: number
   readonly callsign: string
   readonly size: PlaneSize
+  readonly spawnTime: number
   x: number
   y: number
   heading = 0 // radians
@@ -106,7 +107,7 @@ export class Plane {
     x: number,
     y: number,
     fuel: number,
-    _spawnTime: number,
+    spawnTime: number,
     size: PlaneSize = 'small'
   ) {
     this.id = id
@@ -114,6 +115,7 @@ export class Plane {
     this.x = x
     this.y = y
     this.fuel = fuel
+    this.spawnTime = spawnTime
     this.size = size
     const { holdingCenterX, holdingCenterY } = CONFIG.approach
     this.heading = Math.atan2(holdingCenterY - y, holdingCenterX - x)

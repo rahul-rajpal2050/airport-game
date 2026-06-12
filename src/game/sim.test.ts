@@ -68,6 +68,7 @@ describe('full shift simulation', () => {
     expect(state.stats.landed).toBeGreaterThan(0)
     expect(state.stats.departed).toBeGreaterThan(0)
     expect(state.stats.departedOnTime).toBeGreaterThan(0)
+    expect(state.stats.arrivedOnTime).toBeGreaterThan(0) // prompt assignment lands on schedule
     expect(state.stats.score).toBeGreaterThan(0)
   })
 

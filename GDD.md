@@ -22,7 +22,8 @@ later adaptation, not the default.
 3. ✅ 24-hour clock (06:00→22:00 over the 5-minute shift, top-left; score top-right),
    rush-hour spawn waves (7–9, 11–1, 3–5, 7–9 with 19–21 the hardest), day/night
    palette with dawn/dusk transitions and runway edge lights after dark
-4. Satisfaction scoring — zero-delay/zero-complaint aspiration measured via D:00 and A:00
+4. ✅ Satisfaction scoring — headline score is passenger satisfaction % (0.4×A:00 +
+   0.6×D:00, minus 5% per complaint = rage/diversion); points demoted to "ops score"
 5. Daily challenge + leaderboard (friends competition; architecture ready via seeded runs)
 6. 2.5D isometric visual overhaul (altitude shadows, banking planes, depth-sorted terminal)
 

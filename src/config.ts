@@ -387,6 +387,15 @@ export const CONFIG = {
     rageShakeMs: 400,
   },
 
+  satisfaction: {
+    // scheduled arrival = spawnTime + this; prompt assignment lands on time,
+    // extended circling goes late and drags A:00 down
+    arrivalWindowSeconds: 75,
+    weightArrivals: 0.4,
+    weightDepartures: 0.6,   // D:00 is the airline-facing KPI, weighs more
+    complaintPenalty: 5,     // % satisfaction lost per rage or diversion
+  },
+
   scoring: {
     landingBase: 40,                 // landing pays small, scaled by patience
     departBase: 140,                 // departure pays big, scaled down by delay
