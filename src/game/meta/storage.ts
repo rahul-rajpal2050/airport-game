@@ -15,6 +15,8 @@ export interface Settings {
   nearMisses: boolean
   gateCount: number
   runwayCount: number
+  tutorialSeen: boolean
+  playerName: string
 }
 
 export interface SaveData {
@@ -29,7 +31,14 @@ export interface SaveData {
 }
 
 export function defaultSettings(): Settings {
-  return { difficulty: 'normal', nearMisses: true, gateCount: 10, runwayCount: 3 }
+  return {
+    difficulty: 'normal',
+    nearMisses: true,
+    gateCount: 10,
+    runwayCount: 3,
+    tutorialSeen: false,
+    playerName: '',
+  }
 }
 
 export interface StorageBackend {

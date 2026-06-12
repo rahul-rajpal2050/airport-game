@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { CONFIG } from '../config'
 import { initAudio } from '../game/juice/audio'
 import {
@@ -13,6 +13,7 @@ import {
 } from '../game/meta/campaign'
 import type { Difficulty } from '../game/meta/storage'
 import { buttonStyle, overlayStyle, secondaryButtonStyle } from './overlay'
+import { TutorialPrompt, TutorialSlides } from './Tutorial'
 
 const toggleStyle: CSSProperties = {
   fontFamily: 'monospace',
@@ -36,6 +37,31 @@ export function Menu() {
   const saved = hasSavedRun()
   const run = getRun()
   const settings = getSettings()
+  const [tutorial, setTutorial] = useState<null | { stage: 'prompt' | 'slides'; then: () => void }>(null)
+
+  // first start: offer the tutorial once; afterwards actions run directly
+  const launch = (action: () => void) => {
+    initAudio()
+    if (!settings.tutorialSeen) setTutorial({ stage: 'prompt', then: action })
+    else action()
+  }
+  const finishTutorial = (then: () => void) => {
+    updateSettings({ tutorialSeen: true })
+    setTutorial(null)
+    then()
+  }
+
+  if (tutorial?.stage === 'prompt') {
+    return (
+      <TutorialPrompt
+        onYes={() => setTutorial({ ...tutorial, stage: 'slides' })}
+        onNo={() => finishTutorial(tutorial.then)}
+      />
+    )
+  }
+  if (tutorial?.stage === 'slides') {
+    return <TutorialSlides onDone={() => finishTutorial(tutorial.then)} />
+  }
 
   return (
     <div style={overlayStyle}>
@@ -45,33 +71,21 @@ export function Menu() {
         need a runway to leave. Keep everyone alive and on time.
       </p>
       {saved && run && (
-        <button
-          style={buttonStyle}
-          onClick={() => {
-            initAudio()
-            continueRun()
-          }}
-        >
+        <button style={buttonStyle} onClick={() => launch(continueRun)}>
           CONTINUE RUN — SHIFT {run.shiftIndex + 1}/5, REP {run.reputation}
         </button>
       )}
-      <button
-        style={saved ? secondaryButtonStyle : buttonStyle}
-        onClick={() => {
-          initAudio()
-          startRun()
-        }}
-      >
+      <button style={saved ? secondaryButtonStyle : buttonStyle} onClick={() => launch(startRun)}>
         NEW RUN
       </button>
-      <button
-        style={secondaryButtonStyle}
-        onClick={() => {
-          initAudio()
-          startFreeShift()
-        }}
-      >
+      <button style={secondaryButtonStyle} onClick={() => launch(startFreeShift)}>
         FREE SHIFT
+      </button>
+      <button
+        style={{ ...toggleStyle, marginTop: 4 }}
+        onClick={() => setTutorial({ stage: 'slides', then: () => {} })}
+      >
+        HOW TO PLAY
       </button>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
         {(Object.keys(CONFIG.difficulty) as Difficulty[]).map((level) => (
