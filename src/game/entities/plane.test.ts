@@ -8,7 +8,7 @@ function makeCtx(shiftTime = 0): UpdateContext {
   return neutralContext(shiftTime)
 }
 
-function makePlane(fuel = CONFIG.plane.initialFuel, id = 1): Plane {
+function makePlane(fuel: number = CONFIG.plane.initialFuel, id = 1): Plane {
   return new Plane(id, `TS${id}00`, 0, 0, fuel, 0)
 }
 

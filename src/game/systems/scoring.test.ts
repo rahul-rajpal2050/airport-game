@@ -66,7 +66,7 @@ describe('applyScoring', () => {
   it('full patience landing pays the full landing base', () => {
     const state = makeState()
     state.events.push({ type: 'landed', plane: makePlane() })
-    applyScoring(state)
+    applyScoring(state, 0)
     expect(state.stats.score).toBe(S.landingBase)
     expect(state.stats.landed).toBe(1)
   })
@@ -74,7 +74,7 @@ describe('applyScoring', () => {
   it('on-time departure pays depart base plus on-time bonus', () => {
     const state = makeState()
     state.events.push({ type: 'departed_ok', plane: makePlane(), delaySeconds: 0 })
-    applyScoring(state)
+    applyScoring(state, 0)
     expect(state.stats.score).toBe(S.departBase + S.onTimeBonus)
     expect(state.stats.departed).toBe(1)
     expect(state.stats.departedOnTime).toBe(1)
@@ -84,7 +84,7 @@ describe('applyScoring', () => {
     const state = makeState()
     const delay = 100
     state.events.push({ type: 'departed_ok', plane: makePlane(), delaySeconds: delay })
-    applyScoring(state)
+    applyScoring(state, 0)
     const expectedFrac = Math.max(1 - delay * S.lateMultiplierPerSecond, S.minLandingFraction)
     expect(state.stats.score).toBe(Math.round(S.departBase * expectedFrac))
     expect(state.stats.departedOnTime).toBe(0)
@@ -95,7 +95,7 @@ describe('applyScoring', () => {
   it('extreme delay floors at minLandingFraction', () => {
     const state = makeState()
     state.events.push({ type: 'departed_ok', plane: makePlane(), delaySeconds: 9999 })
-    applyScoring(state)
+    applyScoring(state, 0)
     expect(state.stats.score).toBe(Math.round(S.departBase * S.minLandingFraction))
   })
 
@@ -103,7 +103,7 @@ describe('applyScoring', () => {
     const state = makeState()
     state.events.push({ type: 'diverted', plane: makePlane() })
     state.events.push({ type: 'raged', plane: makePlane() })
-    applyScoring(state)
+    applyScoring(state, 0)
     expect(state.stats.score).toBe(-S.diversionPenalty - S.ragePenalty)
     expect(state.stats.diverted).toBe(1)
     expect(state.stats.raged).toBe(1)
@@ -115,7 +115,7 @@ describe('applyScoring', () => {
     const b = new Plane(2, 'BB222', 0, 0, 80, 0)
     state.events.push({ type: 'near_miss', a, b })
     state.events.push({ type: 'near_miss', a, b })
-    applyScoring(state)
+    applyScoring(state, 0)
     const expected =
       Math.round(S.nearMissBonus) + Math.round(S.nearMissBonus * (1 + S.streakMultiplierStep))
     expect(state.stats.score).toBe(expected)
@@ -129,7 +129,7 @@ describe('applyScoring', () => {
     state.streak = 4
     state.stats.bestStreak = 4
     state.events.push({ type: 'raged', plane: makePlane() })
-    applyScoring(state)
+    applyScoring(state, 0)
     expect(state.streak).toBe(0)
     expect(state.stats.bestStreak).toBe(4)
   })
@@ -158,7 +158,7 @@ describe('applyScoring', () => {
     slow.holdSeconds = 87
     state.events.push({ type: 'landed', plane: quick })
     state.events.push({ type: 'diverted', plane: slow })
-    applyScoring(state)
+    applyScoring(state, 0)
     expect(state.stats.longestHoldSeconds).toBe(87)
     expect(state.stats.longestHoldCallsign).toBe('SS200')
   })

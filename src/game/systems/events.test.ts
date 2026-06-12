@@ -177,7 +177,7 @@ describe('effect application', () => {
     expect(state.vipPriority).toBe(true)
 
     // next spawn becomes the VIP and lands at the front of a queue
-    state.schedule = [{ time: 5, x: 0, y: 0, callsign: 'VIP01', fuel: 80 }]
+    state.schedule = [{ time: 5, x: 0, y: 0, callsign: 'VIP01', fuel: 80, size: 'small' }]
     updateSpawns(state)
     const vip = state.planes.find((p) => p.callsign === 'VIP01')!
     expect(vip.kind).toBe('vip')

@@ -317,7 +317,7 @@ function planeColor(plane: Plane, shiftTime: number): string {
 
 function drawPlane(ctx: CanvasRenderingContext2D, plane: Plane, selected: boolean, shiftTime: number): void {
   if (plane.state === 'departed' || plane.state === 'diverted') return
-  const { width: w, height: h } = CONFIG.plane
+  const { height: h } = CONFIG.plane
   const stuck = plane.state === 'rolling' && plane.rolloutDone && !plane.assignedGate
 
   ctx.save()

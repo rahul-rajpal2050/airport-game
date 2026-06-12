@@ -15,7 +15,7 @@ export function attachInput(canvas: HTMLCanvasElement, getState: () => GameState
 
     // 1. plane tap — nearest selectable plane within hit radius
     let nearest = null
-    let nearestDist = CONFIG.plane.hitRadiusPixels
+    let nearestDist: number = CONFIG.plane.hitRadiusPixels
     for (const plane of state.planes) {
       if (!plane.isSelectable) continue
       const d = Math.hypot(plane.x - lx, plane.y - ly)
