@@ -54,22 +54,45 @@ export function generateSchedule(rng: RNG, rateMult = 1): SpawnEntry[] {
     ([hour, rate]) => [hourToShiftSeconds(hour), rate] as [number, number]
   )
   const entries: SpawnEntry[] = []
-  let t = 0
-  for (;;) {
-    const rate = rateAt(t, curve) * rateMult
-    const meanInterval = 60 / rate
-    t += meanInterval * (0.5 + rng.next()) // jittered around the mean
-    if (t >= durationSeconds) break
+  const rollEntry = (time: number): SpawnEntry => {
     const pos = rollEdgePosition(rng)
-    entries.push({
-      time: t,
+    return {
+      time,
       x: pos.x,
       y: pos.y,
       callsign: rollCallsign(rng),
       // fuel is a % of the size's circling budget; some flights arrive short
       fuel: CONFIG.plane.initialFuel - rng.int(0, CONFIG.approach.fuelJitter),
       size: rng.next() < CONFIG.shift.largeProbability ? 'large' : 'small',
-    })
+    }
+  }
+
+  let t = 0
+  for (;;) {
+    const rate = rateAt(t, curve) * rateMult
+    const meanInterval = 60 / rate
+    t += meanInterval * (0.5 + rng.next()) // jittered around the mean
+    if (t >= durationSeconds) break
+    entries.push(rollEntry(t))
+
+    // formation waves: in rush-level traffic, arrivals can bunch up. The next
+    // interval stretches by the group size so the average rate is unchanged.
+    let groupSize = 1
+    const G = CONFIG.shift
+    if (rate >= G.groupRushThreshold && rng.next() < G.groupProbability) {
+      const extras = rng.int(1, G.groupExtraMax)
+      for (let i = 0; i < extras; i++) {
+        const offset = rng.float(G.groupSpacingSeconds[0], G.groupSpacingSeconds[1]) * (i + 1)
+        if (t + offset < durationSeconds) {
+          entries.push(rollEntry(t + offset))
+          groupSize++
+        }
+      }
+    }
+    if (groupSize > 1) {
+      const rateAfter = rateAt(t, curve) * rateMult
+      t += (60 / rateAfter) * (0.5 + rng.next()) * (groupSize - 1)
+    }
   }
   return entries
 }

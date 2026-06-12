@@ -26,6 +26,23 @@ describe('generateSchedule', () => {
     }
   })
 
+  it('group arrivals form in rush hours, never in the quiet open', () => {
+    let foundGroup = false
+    for (let seed = 0; seed < 20; seed++) {
+      const schedule = generateSchedule(new RNG(seed))
+      const morningRushStart = hourToShiftSeconds(7)
+      for (let i = 1; i < schedule.length; i++) {
+        const gap = schedule[i].time - schedule[i - 1].time
+        if (gap < 5) {
+          foundGroup = true
+          // bunched arrivals only exist at rush-level traffic, not the 6-7am warm-up
+          expect(schedule[i].time).toBeGreaterThan(morningRushStart)
+        }
+      }
+    }
+    expect(foundGroup).toBe(true)
+  })
+
   it('fuel stays within jitter bounds', () => {
     const { initialFuel } = CONFIG.plane
     const { fuelJitter } = CONFIG.approach
