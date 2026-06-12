@@ -39,9 +39,8 @@ function tone(
   osc.stop(t1)
 }
 
-function noiseBurst(durationMs: number, volume: number, filterFreq: number): void {
-  if (!audioCtx || !master) return
-  const t0 = audioCtx.currentTime
+function makeNoiseSource(durationMs: number): AudioBufferSourceNode | null {
+  if (!audioCtx) return null
   const length = Math.ceil((audioCtx.sampleRate * durationMs) / 1000)
   const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate)
   const data = buffer.getChannelData(0)
@@ -54,20 +53,51 @@ function noiseBurst(durationMs: number, volume: number, filterFreq: number): voi
   }
   const src = audioCtx.createBufferSource()
   src.buffer = buffer
+  return src
+}
+
+interface NoiseShape {
+  durationMs: number
+  volume: number
+  filterType?: BiquadFilterType
+  filterFrom: number
+  filterTo?: number
+  /** gain envelope: rise to volume over attackMs, then decay to silence */
+  attackMs?: number
+}
+
+/** Filtered noise with optional filter sweep and attack — the basis of every "real" sound */
+function noiseLayer(shape: NoiseShape): void {
+  if (!audioCtx || !master) return
+  const src = makeNoiseSource(shape.durationMs)
+  if (!src) return
+  const t0 = audioCtx.currentTime
+  const t1 = t0 + shape.durationMs / 1000
   const filter = audioCtx.createBiquadFilter()
-  filter.type = 'lowpass'
-  filter.frequency.value = filterFreq
+  filter.type = shape.filterType ?? 'lowpass'
+  filter.frequency.setValueAtTime(shape.filterFrom, t0)
+  if (shape.filterTo !== undefined) filter.frequency.exponentialRampToValueAtTime(shape.filterTo, t1)
   const gain = audioCtx.createGain()
-  gain.gain.setValueAtTime(volume, t0)
-  gain.gain.exponentialRampToValueAtTime(0.001, t0 + durationMs / 1000)
+  if (shape.attackMs) {
+    gain.gain.setValueAtTime(0.001, t0)
+    gain.gain.exponentialRampToValueAtTime(shape.volume, t0 + shape.attackMs / 1000)
+  } else {
+    gain.gain.setValueAtTime(shape.volume, t0)
+  }
+  gain.gain.exponentialRampToValueAtTime(0.001, t1)
   src.connect(filter).connect(gain).connect(master)
   src.start(t0)
 }
 
-/** Landing: low thunk + tire-noise burst */
+function noiseBurst(durationMs: number, volume: number, filterFreq: number): void {
+  noiseLayer({ durationMs, volume, filterFrom: filterFreq })
+}
+
+/** Landing: touchdown thump + tire screech (band-passed noise sweeping down) */
 export function playThunk(): void {
-  tone(90, 160, 'sine', 0.9, 45)
-  noiseBurst(120, 0.5, 600)
+  tone(85, 180, 'sine', 0.9, 40)              // airframe thump
+  noiseLayer({ durationMs: 450, volume: 0.4, filterType: 'bandpass', filterFrom: 1900, filterTo: 500 }) // tires
+  noiseBurst(150, 0.4, 500)                   // dust/spoilers
 }
 
 /** Near-miss: filtered noise whoosh + rising ping */
@@ -82,10 +112,20 @@ export function playAlarm(): void {
   setTimeout(() => tone(330, 220, 'square', 0.35), 150)
 }
 
-/** Takeoff: rising rumble */
+/** Takeoff: ~3s jet spool — noise sweeping up through a lowpass, sub-rumble under it, fading as the plane climbs away */
 export function playTakeoff(): void {
-  tone(60, 600, 'sawtooth', 0.5, 140)
-  noiseBurst(500, 0.25, 400)
+  // engine spool: filter opens as thrust builds, long tail as it departs
+  noiseLayer({ durationMs: 3000, volume: 0.55, filterFrom: 180, filterTo: 2600, attackMs: 900 })
+  // turbine whine riding on top
+  noiseLayer({ durationMs: 2600, volume: 0.12, filterType: 'bandpass', filterFrom: 1400, filterTo: 3400, attackMs: 700 })
+  // airframe sub-rumble, pitch falling at the end (doppler as it climbs out)
+  tone(48, 2800, 'sawtooth', 0.35, 30)
+}
+
+/** New arrival on frequency: radio squelch + short readback tone */
+export function playRadioBlip(): void {
+  noiseLayer({ durationMs: 70, volume: 0.18, filterType: 'highpass', filterFrom: 2400 })
+  setTimeout(() => tone(1150, 70, 'square', 0.08), 75)
 }
 
 /** Turnaround done: friendly two-note chime */

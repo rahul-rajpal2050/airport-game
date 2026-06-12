@@ -1,6 +1,6 @@
 import { CONFIG } from '../../config'
 import type { GameState } from '../state'
-import { playAlarm, playBuzz, playChime, playTakeoff, playThunk, playWhoosh } from './audio'
+import { playAlarm, playBuzz, playChime, playRadioBlip, playTakeoff, playThunk, playWhoosh } from './audio'
 
 function shake(state: GameState, intensity: number, durationMs: number): void {
   // a bigger shake always wins over a fading one
@@ -16,6 +16,9 @@ export function applyJuice(state: GameState): void {
   const J = CONFIG.juice
   for (const event of state.juiceEvents) {
     switch (event.type) {
+      case 'spawned':
+        playRadioBlip()
+        break
       case 'landed':
         playThunk()
         break
