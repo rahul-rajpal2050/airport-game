@@ -1,5 +1,5 @@
 import { CONFIG, identityModifiers, type Modifiers, type PerkDef, type ShiftArchetype } from '../../config'
-import { RNG, randomSessionSeed } from '../../utils/rng'
+import { dailySeed, RNG, randomSessionSeed } from '../../utils/rng'
 import { onShiftEnd, returnToMenu, startShift } from '../loop'
 import { gameStore, type ShiftStats } from '../state'
 import { emptySave, loadSave, persistSave, type RunState, type SaveData, type Settings } from './storage'
@@ -48,12 +48,25 @@ export function updateSettings(patch: Partial<Settings>): void {
   gameStore.notify()
 }
 
+/**
+ * Daily challenge: everyone worldwide plays the identical seeded shift today,
+ * so leaderboard scores are directly comparable. Settings still apply — the
+ * leaderboard shows raw results, friendly rivalry handles the rest.
+ */
+export function startDailyChallenge(): void {
+  startSeededShift(dailySeed())
+}
+
 /** One-off shift outside the campaign, honoring difficulty + toggles */
 export function startFreeShift(): void {
+  startSeededShift(randomSessionSeed())
+}
+
+function startSeededShift(seed: number | string): void {
   active = false
   ui = null
   const diff = CONFIG.difficulty[save.settings.difficulty]
-  startShift(randomSessionSeed(), {
+  startShift(seed, {
     modifiers: identityModifiers(),
     spawnRateMult: diff.spawnRateMult,
     nearMisses: save.settings.nearMisses,

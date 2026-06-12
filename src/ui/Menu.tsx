@@ -7,11 +7,15 @@ import {
   getRun,
   getSettings,
   hasSavedRun,
+  startDailyChallenge,
   startFreeShift,
   startRun,
   updateSettings,
 } from '../game/meta/campaign'
+import { backendConfigured } from '../game/meta/leaderboard'
 import type { Difficulty } from '../game/meta/storage'
+import { FeedbackBox } from './FeedbackBox'
+import { Leaderboard } from './Leaderboard'
 import { buttonStyle, overlayStyle, secondaryButtonStyle } from './overlay'
 import { TutorialPrompt, TutorialSlides } from './Tutorial'
 
@@ -38,6 +42,7 @@ export function Menu() {
   const run = getRun()
   const settings = getSettings()
   const [tutorial, setTutorial] = useState<null | { stage: 'prompt' | 'slides'; then: () => void }>(null)
+  const [screen, setScreen] = useState<null | 'leaderboard' | 'feedback'>(null)
 
   // first start: offer the tutorial once; afterwards actions run directly
   const launch = (action: () => void) => {
@@ -62,6 +67,8 @@ export function Menu() {
   if (tutorial?.stage === 'slides') {
     return <TutorialSlides onDone={() => finishTutorial(tutorial.then)} />
   }
+  if (screen === 'leaderboard') return <Leaderboard onClose={() => setScreen(null)} />
+  if (screen === 'feedback') return <FeedbackBox onClose={() => setScreen(null)} />
 
   return (
     <div style={overlayStyle}>
@@ -81,12 +88,24 @@ export function Menu() {
       <button style={secondaryButtonStyle} onClick={() => launch(startFreeShift)}>
         FREE SHIFT
       </button>
-      <button
-        style={{ ...toggleStyle, marginTop: 4 }}
-        onClick={() => setTutorial({ stage: 'slides', then: () => {} })}
-      >
-        HOW TO PLAY
+      <button style={secondaryButtonStyle} onClick={() => launch(startDailyChallenge)}>
+        DAILY CHALLENGE
       </button>
+      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+        <button style={toggleStyle} onClick={() => setTutorial({ stage: 'slides', then: () => {} })}>
+          HOW TO PLAY
+        </button>
+        {backendConfigured() && (
+          <>
+            <button style={toggleStyle} onClick={() => setScreen('leaderboard')}>
+              LEADERBOARD
+            </button>
+            <button style={toggleStyle} onClick={() => setScreen('feedback')}>
+              FEEDBACK
+            </button>
+          </>
+        )}
+      </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
         {(Object.keys(CONFIG.difficulty) as Difficulty[]).map((level) => (
           <button

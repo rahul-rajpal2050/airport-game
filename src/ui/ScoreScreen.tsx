@@ -1,7 +1,16 @@
+import { useState } from 'react'
 import { getState } from '../game/loop'
-import { advance, getUi, isCampaignActive, startFreeShift } from '../game/meta/campaign'
+import {
+  advance,
+  getSettings,
+  getUi,
+  isCampaignActive,
+  startFreeShift,
+  updateSettings,
+} from '../game/meta/campaign'
+import { backendConfigured, submitScore } from '../game/meta/leaderboard'
 import { satisfactionOf } from '../game/systems/scoring'
-import { buttonStyle, overlayStyle } from './overlay'
+import { buttonStyle, overlayStyle, secondaryButtonStyle } from './overlay'
 
 function satisfactionColor(pct: number): string {
   if (pct >= 90) return '#4ade80'
@@ -12,10 +21,24 @@ function satisfactionColor(pct: number): string {
 export function ScoreScreen() {
   const { stats, seed } = getState()
   const campaign = isCampaignActive() ? getUi() : null
+  const [name, setName] = useState(getSettings().playerName)
+  const [submitState, setSubmitState] = useState<'idle' | 'sending' | 'done' | 'failed'>('idle')
 
   const gameOver = stats.gameOverCallsign !== ''
   const satisfaction = satisfactionOf(stats)
   const complaints = stats.raged + stats.diverted
+
+  const submit = async () => {
+    setSubmitState('sending')
+    updateSettings({ playerName: name })
+    const ok = await submitScore({
+      name: name || 'anonymous',
+      satisfaction,
+      opsScore: stats.score,
+      seed: String(seed),
+    })
+    setSubmitState(ok ? 'done' : 'failed')
+  }
   return (
     <div style={overlayStyle}>
       {gameOver ? (
@@ -88,6 +111,44 @@ export function ScoreScreen() {
           </div>
         )}
       </div>
+      {backendConfigured() && !campaign && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {submitState === 'done' ? (
+            <span style={{ color: '#4ade80', fontFamily: 'monospace', fontSize: 14 }}>
+              on the board ✓
+            </span>
+          ) : (
+            <>
+              <input
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  background: '#1f2937',
+                  color: '#e2e8f0',
+                  border: '1px solid #374151',
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  width: 150,
+                }}
+                placeholder="your name"
+                value={name}
+                maxLength={20}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <button
+                style={{ ...secondaryButtonStyle, fontSize: 13, opacity: name.trim() ? 1 : 0.4 }}
+                disabled={!name.trim() || submitState === 'sending'}
+                onClick={submit}
+              >
+                {submitState === 'sending' ? 'SENDING…' : 'ADD TO LEADERBOARD'}
+              </button>
+              {submitState === 'failed' && (
+                <span style={{ color: '#ef4444', fontSize: 12 }}>failed — retry</span>
+              )}
+            </>
+          )}
+        </div>
+      )}
       {campaign ? (
         <button style={buttonStyle} onClick={advance}>
           CONTINUE

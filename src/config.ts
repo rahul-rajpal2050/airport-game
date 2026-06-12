@@ -392,6 +392,13 @@ export const CONFIG = {
     rageShakeMs: 400,
   },
 
+  backend: {
+    // Supabase project credentials (anon key is safe to ship in client code).
+    // Empty strings = leaderboard and feedback UI stay hidden.
+    supabaseUrl: '',
+    supabaseAnonKey: '',
+  },
+
   satisfaction: {
     // scheduled arrival = spawnTime + this; prompt assignment lands on time,
     // extended circling goes late and drags A:00 down
