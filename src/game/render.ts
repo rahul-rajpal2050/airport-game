@@ -21,8 +21,6 @@ const PLANE_BASELINE_WIDTH = 28
 
 const COLORS = {
   bg: '#0a0e1a',
-  bgGradientTop: '#0b101f',
-  bgGradientBottom: '#16203a',
   apron: 'rgba(30, 41, 66, 0.45)',
   apronEdge: 'rgba(74, 85, 104, 0.35)',
   shadow: 'rgba(0, 0, 0, 0.35)',
@@ -50,23 +48,56 @@ const COLORS = {
   barBg: 'rgba(148, 163, 184, 0.25)',
 } as const
 
-let bgGradient: CanvasGradient | null = null
+// Day/night palette keyframes: [clockHour, bgTop, bgBottom, nightness 0..1].
+// Nightness drives runway edge lights and apron dimming.
+const PALETTE: [number, string, string, number][] = [
+  [6, '#241a2e', '#4e333c', 0.7],    // dawn: warm horizon, lights still on
+  [8, '#142138', '#2b3c58', 0],      // morning daylight
+  [16.5, '#142138', '#2b3c58', 0],   // afternoon
+  [19, '#1d1530', '#52313f', 0.45],  // dusk
+  [20.5, '#07090f', '#101728', 1],   // night
+  [22, '#06080d', '#0d1320', 1],
+]
+
+function hexLerp(a: string, b: string, t: number): string {
+  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16))
+  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16))
+  const mix = pa.map((v, i) => Math.round(v + (pb[i] - v) * t))
+  return `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`
+}
+
+function paletteAt(hour: number): { top: string; bottom: string; nightness: number } {
+  const first = PALETTE[0]
+  if (hour <= first[0]) return { top: first[1], bottom: first[2], nightness: first[3] }
+  for (let i = 1; i < PALETTE.length; i++) {
+    const [h1, top1, bottom1, n1] = PALETTE[i]
+    if (hour <= h1) {
+      const [h0, top0, bottom0, n0] = PALETTE[i - 1]
+      const t = (hour - h0) / (h1 - h0)
+      return {
+        top: hexLerp(top0, top1, t),
+        bottom: hexLerp(bottom0, bottom1, t),
+        nightness: n0 + (n1 - n0) * t,
+      }
+    }
+  }
+  const last = PALETTE[PALETTE.length - 1]
+  return { top: last[1], bottom: last[2], nightness: last[3] }
+}
+
 let vignette: CanvasGradient | null = null
 
-function drawBackground(ctx: CanvasRenderingContext2D): void {
+function drawBackground(ctx: CanvasRenderingContext2D, hour: number, nightness: number): void {
   const { width, height } = CONFIG.canvas
-  if (!bgGradient) {
-    bgGradient = ctx.createLinearGradient(0, 0, 0, height)
-    bgGradient.addColorStop(0, COLORS.bgGradientTop)
-    bgGradient.addColorStop(1, COLORS.bgGradientBottom)
-    vignette = ctx.createRadialGradient(width / 2, height / 2, height * 0.35, width / 2, height / 2, width * 0.75)
-    vignette.addColorStop(0, 'rgba(0,0,0,0)')
-    vignette.addColorStop(1, 'rgba(0,0,0,0.4)')
-  }
+  const sky = paletteAt(hour)
+  const bgGradient = ctx.createLinearGradient(0, 0, 0, height)
+  bgGradient.addColorStop(0, sky.top)
+  bgGradient.addColorStop(1, sky.bottom)
   ctx.fillStyle = bgGradient
   ctx.fillRect(0, 0, width, height)
 
-  // apron: the paved field around runways and the V-terminal
+  // apron: the paved field around runways and the V-terminal, dimmed at night
+  ctx.globalAlpha = 1 - 0.35 * nightness
   ctx.fillStyle = COLORS.apron
   ctx.strokeStyle = COLORS.apronEdge
   ctx.lineWidth = 1
@@ -74,14 +105,22 @@ function drawBackground(ctx: CanvasRenderingContext2D): void {
   ctx.roundRect(190, 232, 580, 358, 18)
   ctx.fill()
   ctx.stroke()
+  ctx.globalAlpha = 1
 
-  ctx.fillStyle = vignette!
+  if (!vignette) {
+    vignette = ctx.createRadialGradient(width / 2, height / 2, height * 0.35, width / 2, height / 2, width * 0.75)
+    vignette.addColorStop(0, 'rgba(0,0,0,0)')
+    vignette.addColorStop(1, 'rgba(0,0,0,0.4)')
+  }
+  ctx.fillStyle = vignette
   ctx.fillRect(0, 0, width, height)
 }
 
 export function draw(ctx: CanvasRenderingContext2D, state: GameState): void {
   const { width, height } = CONFIG.canvas
-  drawBackground(ctx)
+  const hour = clockHourAt(state.shiftTime)
+  const nightness = paletteAt(hour).nightness
+  drawBackground(ctx, hour, nightness)
 
   if (state.phase === 'pre_shift') return // React menu covers the canvas
 
@@ -94,7 +133,7 @@ export function draw(ctx: CanvasRenderingContext2D, state: GameState): void {
 
   drawHoldingRings(ctx, state)
   drawTerminal(ctx, state.gates)
-  for (const runway of state.runways) drawRunway(ctx, runway, state.shiftTime)
+  for (const runway of state.runways) drawRunway(ctx, runway, state.shiftTime, nightness)
   drawAssignmentLines(ctx, state)
   for (const plane of state.planes) drawPlane(ctx, plane, plane.id === state.selectedPlaneId, state.shiftTime)
   drawHud(ctx, state)
@@ -167,7 +206,12 @@ function drawHoldingRings(ctx: CanvasRenderingContext2D, state: GameState): void
   }
 }
 
-function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, shiftTime: number): void {
+function drawRunway(
+  ctx: CanvasRenderingContext2D,
+  runway: Runway,
+  shiftTime: number,
+  nightness = 0
+): void {
   const { lengthPixels } = CONFIG.runway
   const widthPixels = runway.width
   const closed = shiftTime < runway.closedUntil
@@ -177,6 +221,15 @@ function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, shiftTime: nu
 
   ctx.fillStyle = COLORS.runway
   ctx.fillRect(-lengthPixels / 2, -widthPixels / 2, lengthPixels, widthPixels)
+
+  // edge lights after dark (and at dawn): paired amber dots along both sides
+  if (nightness > 0.05) {
+    ctx.fillStyle = `rgba(255, 214, 140, ${0.85 * nightness})`
+    for (let x = -lengthPixels / 2 + 8; x <= lengthPixels / 2 - 8; x += 18) {
+      ctx.fillRect(x, -widthPixels / 2 - 3, 2.5, 2.5)
+      ctx.fillRect(x, widthPixels / 2 + 1, 2.5, 2.5)
+    }
+  }
 
   // centerline dashes
   ctx.strokeStyle = COLORS.runwayStripe
