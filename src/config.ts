@@ -395,9 +395,10 @@ export const CONFIG = {
   backend: {
     // Supabase project credentials (anon key is safe to ship in client code).
     // Empty strings = leaderboard and feedback UI stay hidden.
-    supabaseUrl: '',
-    supabaseAnonKey: '',
-  },
+    supabaseUrl: 'https://yaxntjzblutxeitcksdd.supabase.co',
+    supabaseAnonKey:
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlheG50anpibHV0eGVpdGNrc2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzg0ODAsImV4cCI6MjA5Njg1NDQ4MH0.0L_S2LwxmxyAXTEvKaIKfLm-XW3lISqCOpZHBN6vOyQ',
+  } as { supabaseUrl: string; supabaseAnonKey: string },
 
   satisfaction: {
     // scheduled arrival = spawnTime + this; prompt assignment lands on time,

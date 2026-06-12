@@ -1,17 +1,24 @@
-import { afterEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { CONFIG } from '../../config'
 import { backendConfigured, fetchTop, setFetchImpl, submitFeedback, submitScore, type FetchLike } from './leaderboard'
 
 const backend = CONFIG.backend as { supabaseUrl: string; supabaseAnonKey: string }
+const original = { ...CONFIG.backend }
 
 function configure(): void {
   backend.supabaseUrl = 'https://test.supabase.co'
   backend.supabaseAnonKey = 'test-key'
 }
 
-afterEach(() => {
+beforeEach(() => {
+  // isolate from the real (committed) credentials
   backend.supabaseUrl = ''
   backend.supabaseAnonKey = ''
+})
+
+afterEach(() => {
+  backend.supabaseUrl = original.supabaseUrl
+  backend.supabaseAnonKey = original.supabaseAnonKey
   setFetchImpl((input, init) => fetch(input, init))
 })
 
