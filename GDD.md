@@ -19,8 +19,9 @@ later adaptation, not the default.
 2. ✅ Vertical runway row above the gates (large center, smalls flanking, 2/3/5 player
    option; land downward, depart upward) + refuelling visuals (translucent turnaround,
    green/yellow ready-glow)
-3. 24-hour in-game clock (top-left; score top-right) with rush-hour traffic waves
-   (7–9, 11–1, 3–5, 7–9) and day/night visual cycle
+3. ✅ 24-hour clock (06:00→22:00 over the 5-minute shift, top-left; score top-right),
+   rush-hour spawn waves (7–9, 11–1, 3–5, 7–9 with 19–21 the hardest), day/night
+   palette with dawn/dusk transitions and runway edge lights after dark
 4. Satisfaction scoring — zero-delay/zero-complaint aspiration measured via D:00 and A:00
 5. Daily challenge + leaderboard (friends competition; architecture ready via seeded runs)
 6. 2.5D isometric visual overhaul (altitude shadows, banking planes, depth-sorted terminal)

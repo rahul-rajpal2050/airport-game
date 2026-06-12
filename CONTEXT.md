@@ -81,6 +81,10 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
 
 ## Recent Changes
+[2026-06-12] 24h clock (06:00-22:00 over the shift, replaces countdown), rush-hour
+spawn waves authored in clock hours (four plateaus, evening hardest), day/night
+palette keyframes with dawn/dusk lerp, runway edge lights after dark, apron dimming.
+clockHourAt/hourToShiftSeconds helpers in config. 80 tests passing.
 [2026-06-11] Vertical runway row above the terminal (arrivals land downward,
 departures roll upward end->threshold, hold-short beside rollout end), RUNWAYS
 menu setting 2/3/5 (center always large), difficulty now a pure traffic dial
