@@ -1,4 +1,4 @@
-import { CONFIG, type PlaneSize } from '../../config'
+import { CONFIG, hourToShiftSeconds, type PlaneSize } from '../../config'
 import type { RNG } from '../../utils/rng'
 import { Plane } from '../entities/plane'
 import type { GameState } from '../state'
@@ -48,11 +48,15 @@ function rollEdgePosition(rng: RNG): { x: number; y: number } {
  * so the same seed always produces the identical shift.
  */
 export function generateSchedule(rng: RNG, rateMult = 1): SpawnEntry[] {
-  const { durationSeconds, spawnCurve } = CONFIG.shift
+  const { durationSeconds } = CONFIG.shift
+  // rush-hour waves are authored in clock hours; sample them in shift seconds
+  const curve = CONFIG.shift.spawnCurveByHour.map(
+    ([hour, rate]) => [hourToShiftSeconds(hour), rate] as [number, number]
+  )
   const entries: SpawnEntry[] = []
   let t = 0
   for (;;) {
-    const rate = rateAt(t, spawnCurve) * rateMult
+    const rate = rateAt(t, curve) * rateMult
     const meanInterval = 60 / rate
     t += meanInterval * (0.5 + rng.next()) // jittered around the mean
     if (t >= durationSeconds) break

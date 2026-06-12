@@ -1,4 +1,4 @@
-import { CONFIG } from '../config'
+import { CONFIG, clockHourAt } from '../config'
 import type { Gate } from './entities/gate'
 import type { Plane } from './entities/plane'
 import type { Runway } from './entities/runway'
@@ -377,14 +377,15 @@ function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
   const { width } = CONFIG.canvas
   const pad = CONFIG.ui.hudPadding
 
+  // 24h clock: the shift is one airport day, 06:00 -> 22:00
+  const hour = clockHourAt(state.shiftTime)
+  const hh = Math.floor(hour)
+  const mm = Math.floor((hour - hh) * 60)
   const remaining = Math.max(0, CONFIG.shift.durationSeconds - state.shiftTime)
-  const m = Math.floor(remaining / 60)
-  const s = Math.floor(remaining % 60)
-
   ctx.font = `bold ${CONFIG.ui.hudFontSize + 4}px monospace`
   ctx.fillStyle = remaining <= 30 ? COLORS.planeWarning : COLORS.hudBright
   ctx.textAlign = 'left'
-  ctx.fillText(`${m}:${String(s).padStart(2, '0')}`, pad, pad + 16)
+  ctx.fillText(`${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`, pad, pad + 16)
 
   ctx.textAlign = 'right'
   ctx.fillStyle = COLORS.hudBright

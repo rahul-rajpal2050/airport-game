@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { CONFIG } from '../../config'
+import { CONFIG, clockHourAt, hourToShiftSeconds } from '../../config'
 import { RNG } from '../../utils/rng'
 import { generateSchedule, rateAt } from './spawn'
 
@@ -33,6 +33,33 @@ describe('generateSchedule', () => {
       expect(entry.fuel).toBeGreaterThanOrEqual(initialFuel - fuelJitter)
       expect(entry.fuel).toBeLessThanOrEqual(initialFuel + fuelJitter)
     }
+  })
+})
+
+describe('clock mapping', () => {
+  it('maps shift seconds to the 06:00-22:00 day', () => {
+    const { durationSeconds, dayStartHour, dayEndHour } = CONFIG.shift
+    expect(clockHourAt(0)).toBe(dayStartHour)
+    expect(clockHourAt(durationSeconds)).toBe(dayEndHour)
+    expect(clockHourAt(durationSeconds / 2)).toBe((dayStartHour + dayEndHour) / 2)
+    expect(clockHourAt(durationSeconds * 2)).toBe(dayEndHour) // clamped
+  })
+
+  it('hourToShiftSeconds inverts clockHourAt', () => {
+    for (const h of [6, 9.5, 14, 22]) {
+      expect(clockHourAt(hourToShiftSeconds(h))).toBeCloseTo(h)
+    }
+  })
+
+  it('rush hours spawn more than lulls', () => {
+    const curve = CONFIG.shift.spawnCurveByHour.map(
+      ([h, r]) => [hourToShiftSeconds(h), r] as [number, number]
+    )
+    const rush = rateAt(hourToShiftSeconds(8), curve) // morning rush
+    const lull = rateAt(hourToShiftSeconds(10), curve)
+    const eveningRush = rateAt(hourToShiftSeconds(20), curve)
+    expect(rush).toBeGreaterThan(lull * 1.5)
+    expect(eveningRush).toBeGreaterThanOrEqual(rush) // the day's hardest
   })
 })
 

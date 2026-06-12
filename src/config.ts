@@ -82,16 +82,27 @@ export const CONFIG = {
   shift: {
     durationSeconds: 300,
     largeProbability: 0.35,    // share of spawns that are wide-body (seeded roll)
-    // [timeSeconds, planesPerMinute] — piecewise linear spawn curve.
-    // Capacity-aware: with 60s/120s circling budgets and a single large strip,
-    // sustained demand beyond ~8/min makes perfect play impossible.
-    spawnCurve: [
-      [0, 4],
-      [60, 5],
-      [120, 6],
-      [180, 7],
-      [240, 8],
-      [300, 8],
+    // The shift is a compressed airport day: the clock runs dayStartHour -> dayEndHour
+    // over durationSeconds (06:00-22:00 in 5 minutes ≈ 18.75s per in-game hour).
+    dayStartHour: 6,
+    dayEndHour: 22,
+    // [clockHour, planesPerMinute] — piecewise linear, shaped as four rush waves
+    // (7-9, 11-13, 15-17, 19-21) with breathing room between. Capacity-aware:
+    // with 60s/120s circling budgets, sustained demand beyond ~8/min is unwinnable.
+    spawnCurveByHour: [
+      [6, 3],
+      [7, 7],
+      [9, 7],   // morning rush holds 7-9
+      [10, 3],
+      [11, 7],
+      [13, 7],  // midday rush holds 11-13
+      [14, 3],
+      [15, 7],
+      [17, 7],  // afternoon rush holds 15-17
+      [18, 3],
+      [19, 8],
+      [21, 8],  // evening rush holds 19-21, the day's hardest
+      [22, 3],
     ] as [number, number][],
   },
 
@@ -417,3 +428,16 @@ export const CONFIG = {
 } as const;
 
 export type Config = typeof CONFIG;
+
+/** Shift seconds -> in-game clock hour (06:00 start, 22:00 end by default) */
+export function clockHourAt(shiftTime: number): number {
+  const { dayStartHour, dayEndHour, durationSeconds } = CONFIG.shift
+  const hour = dayStartHour + (shiftTime / durationSeconds) * (dayEndHour - dayStartHour)
+  return Math.min(hour, dayEndHour)
+}
+
+/** In-game clock hour -> shift seconds (inverse of clockHourAt) */
+export function hourToShiftSeconds(hour: number): number {
+  const { dayStartHour, dayEndHour, durationSeconds } = CONFIG.shift
+  return ((hour - dayStartHour) / (dayEndHour - dayStartHour)) * durationSeconds
+}
