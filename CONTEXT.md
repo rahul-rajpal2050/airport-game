@@ -81,6 +81,13 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
 
 ## Recent Changes
+[2026-06-12] Playtest round 2: pause (space/P/esc + button, freezes sim & timers);
+first arrival in 3-6s (kills dead opening gap); audio overhaul (convolver reverb +
+compressor master chain, detuned/filtered voices, browner LFO+waveshaper jet roar —
+no more chiptune); fog "close one runway" now player-picks the strip (was hardcoded
+to the only large runway = unavoidable game over); re-route escape valve (re-click a
+selected airborne plane → sends to another airport, ops-score cost only, no
+complaint). 93 tests. NOT deployed yet.
 [2026-06-12] Player-facing batch: first-start tutorial offer (5 slides + HOW TO
 PLAY reopen), layered realistic sounds (3s jet-spool takeoff, tire screech, radio
 blips on spawn), rush-hour group arrivals (30% formation waves, rate-compensated,
