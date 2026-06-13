@@ -1,5 +1,6 @@
 import { CONFIG } from '../config'
 import { playBuzz } from './juice/audio'
+import { applyRunwayPick, reroutePlane } from './systems/events'
 import type { GameState } from './state'
 
 const WARNING_MS = 2200
@@ -7,11 +8,22 @@ const WARNING_MS = 2200
 export function attachInput(canvas: HTMLCanvasElement, getState: () => GameState): () => void {
   function onPointerDown(e: PointerEvent): void {
     const state = getState()
-    if (state.phase !== 'active') return
+    if (state.phase !== 'active' || state.paused) return
 
     const rect = canvas.getBoundingClientRect()
     const lx = ((e.clientX - rect.left) / rect.width) * CONFIG.canvas.width
     const ly = ((e.clientY - rect.top) / rect.height) * CONFIG.canvas.height
+
+    // 0. fog "close one runway": the next runway click shuts that strip
+    if (state.runwayPick) {
+      for (const runway of state.runways) {
+        if (runway.containsPoint(lx, ly)) {
+          applyRunwayPick(state, runway)
+          return
+        }
+      }
+      return // ignore non-runway clicks until a runway is chosen
+    }
 
     // 1. plane tap — nearest selectable plane within hit radius
     let nearest = null
@@ -25,6 +37,12 @@ export function attachInput(canvas: HTMLCanvasElement, getState: () => GameState
       }
     }
     if (nearest) {
+      // re-clicking an already-selected airborne plane re-routes it to another airport
+      if (nearest.id === state.selectedPlaneId && nearest.isAirborneControllable) {
+        reroutePlane(state, nearest)
+        state.selectedPlaneId = null
+        return
+      }
       state.selectedPlaneId = nearest.id
       return
     }

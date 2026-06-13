@@ -1,5 +1,7 @@
 import { CONFIG, type EventEffect, type GameEventDef } from '../../config'
 import type { RNG } from '../../utils/rng'
+import type { Plane } from '../entities/plane'
+import type { Runway } from '../entities/runway'
 import { gameStore, type GameState } from '../state'
 
 export interface ScheduledEvent {
@@ -118,6 +120,11 @@ function applyEffects(state: GameState, effects: EventEffect[], pending: Pending
   for (const effect of effects) {
     switch (effect.type) {
       case 'close_runway': {
+        if (effect.runwayId === 'choice') {
+          // hand the choice to the player; the next runway click closes it
+          state.runwayPick = { durationSeconds: effect.durationSeconds }
+          break
+        }
         const id = effect.runwayId === 'marked' ? (pending.markedRunwayId ?? 0) : effect.runwayId
         const runway = state.runways[id]
         if (runway) runway.closedUntil = state.shiftTime + effect.durationSeconds
@@ -240,4 +247,24 @@ export function consumeRiskRoll(state: GameState): number {
   const roll = state.riskRolls[state.riskIndex % state.riskRolls.length]
   state.riskIndex++
   return roll
+}
+
+/** Player clicked a runway to satisfy a pending fog "close one runway" choice */
+export function applyRunwayPick(state: GameState, runway: Runway): void {
+  if (!state.runwayPick) return
+  runway.closedUntil = state.shiftTime + state.runwayPick.durationSeconds
+  state.runwayPick = null
+}
+
+/**
+ * Send an airborne plane to another airport: clears it from the airspace via the
+ * diverted sweep but as a deliberate operational call — ops-score cost, no
+ * complaint, no satisfaction hit. The escape valve when no legal runway is open.
+ */
+export function reroutePlane(state: GameState, plane: Plane): void {
+  if (!plane.isAirborneControllable) return
+  plane.assignedRunway?.removeFromQueue(plane)
+  plane.assignedGate?.release()
+  plane.transition('diverted') // reuses the post-tick sweep that removes the plane
+  state.events.push({ type: 'rerouted', plane })
 }

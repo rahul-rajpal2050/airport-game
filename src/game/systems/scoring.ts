@@ -79,6 +79,11 @@ export function applyScoring(state: GameState, dt: number): void {
       case 'fuel_out':
         state.stats.gameOverCallsign = event.plane.callsign
         break
+      case 'rerouted':
+        // a deliberate operational call: ops cost only, not a complaint
+        state.stats.score -= S.reroutePenalty
+        state.stats.rerouted++
+        break
       case 'near_miss': {
         state.streak++
         state.stats.nearMisses++

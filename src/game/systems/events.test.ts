@@ -1,19 +1,23 @@
 import { describe, expect, it } from 'bun:test'
 import { CONFIG } from '../../config'
 import { RNG } from '../../utils/rng'
+import { Gate } from '../entities/gate'
 import { Plane } from '../entities/plane'
 import { Runway } from '../entities/runway'
 import { newGameState, type GameState } from '../state'
 import {
+  applyRunwayPick,
   consumeRiskRoll,
   fuelMultiplier,
   generateEventSchedule,
   goAroundProbability,
   patienceMultiplier,
+  reroutePlane,
   resolveEvent,
   rollRiskLottery,
   tickEvents,
 } from './events'
+import { applyScoring } from './scoring'
 import { updateSpawns } from './spawn'
 
 function makeState(): GameState {
@@ -104,23 +108,53 @@ describe('tickEvents', () => {
 })
 
 describe('effect application', () => {
-  it('fog option A closes runway 0; sequence will not commit while closed', () => {
+  it('fog option A hands the player a runway choice, which then closes the picked strip', () => {
     const state = makeState()
     state.eventSchedule = [{ defId: 'fog', time: 5 }]
     state.shiftTime = 5
-    const plane = holdingPlane(1)
-    state.planes = [plane]
-    state.runways[0].enqueue(plane)
 
     tickEvents(state)
     resolveEvent(state, 0)
-    expect(state.runways[0].closedUntil).toBe(5 + 45)
+    // no runway is closed yet — the engine is awaiting the player's pick
+    expect(state.runwayPick).not.toBeNull()
+    expect(state.runways.every((r) => r.closedUntil === 0)).toBe(true)
 
-    state.runways[0].sequence(state.shiftTime)
-    expect(plane.state).toBe('holding') // no commit on a closed runway
+    // player clicks runway 1
+    applyRunwayPick(state, state.runways[1])
+    expect(state.runwayPick).toBeNull()
+    expect(state.runways[1].closedUntil).toBe(5 + 45)
+    expect(state.runways[0].closedUntil).toBe(0) // the other strip stays open
+  })
 
-    state.runways[0].sequence(5 + 45.1) // reopened
+  it('re-route clears a plane from the airspace as an ops cost, not a complaint', () => {
+    const state = makeState()
+    const plane = holdingPlane(1)
+    state.planes = [plane]
+    state.runways[0].enqueue(plane)
+    const gate = new Gate(0)
+    gate.reserve(plane)
+
+    reroutePlane(state, plane)
+    expect(plane.state).toBe('diverted') // reuses the sweep
+    expect(state.runways[0].queue).toHaveLength(0)
+    expect(gate.free).toBe(true) // gate reservation released
+    expect(state.events.some((e) => e.type === 'rerouted')).toBe(true)
+    expect(state.events.some((e) => e.type === 'diverted')).toBe(false)
+
+    applyScoring(state, 0)
+    expect(state.stats.rerouted).toBe(1)
+    expect(state.stats.diverted).toBe(0) // no complaint
+    expect(state.stats.score).toBe(-CONFIG.scoring.reroutePenalty)
+  })
+
+  it('re-route only applies to airborne planes', () => {
+    const state = makeState()
+    const plane = holdingPlane(1)
+    plane.transition('landing') // committed, no longer airborne-controllable
+    state.planes = [plane]
+    reroutePlane(state, plane)
     expect(plane.state).toBe('landing')
+    expect(state.events.some((e) => e.type === 'rerouted')).toBe(false)
   })
 
   it('fog option B activates a global go-around risk that expires', () => {

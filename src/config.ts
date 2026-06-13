@@ -3,7 +3,7 @@ export type PlaneSize = 'small' | 'large'
 // Event definitions are data: an event is a combination of effect primitives.
 // Adding an event = adding a def below. New primitive = code in systems/events.ts.
 export type EventEffect =
-  | { type: 'close_runway'; runwayId: number | 'marked'; durationSeconds: number }
+  | { type: 'close_runway'; runwayId: number | 'marked' | 'choice'; durationSeconds: number }
   | { type: 'patience_mult'; mult: number; durationSeconds: number }
   | { type: 'fuel_mult'; mult: number; durationSeconds: number }
   | { type: 'go_around_risk'; probability: number; durationSeconds: number; runwayId?: number | 'marked' }
@@ -231,13 +231,13 @@ export const CONFIG = {
         windowSeconds: [120, 240],
         options: [
           {
-            label: 'Close runway 1',
-            description: 'Half capacity, zero risk. The holding stack will grow.',
-            effects: [{ type: 'close_runway', runwayId: 0, durationSeconds: 45 }],
+            label: 'Close one runway',
+            description: 'Pick a strip to shut for 45s. Half capacity, zero risk.',
+            effects: [{ type: 'close_runway', runwayId: 'choice', durationSeconds: 45 }],
           },
           {
             label: 'Low-visibility ops',
-            description: 'Keep both runways open. Roughly one in three landings will go around.',
+            description: 'Keep every runway open. Roughly one in three landings will go around.',
             effects: [{ type: 'go_around_risk', probability: 0.35, durationSeconds: 45 }],
           },
         ],
@@ -418,6 +418,7 @@ export const CONFIG = {
     onTimeThresholdSeconds: 0,       // D:00 — any overdue second counts as delayed
     lateMultiplierPerSecond: 0.005,  // departure payout reduction per second late
     overdueDripPerSecond: 2,         // score bleed while a boarding plane sits overdue
+    reroutePenalty: 100,             // ops-score cost to send a plane to another airport (no complaint)
     ragePenalty: 150,                // patience hit zero (fires once per plane)
     nearMissBonus: 25,
     streakMultiplierStep: 0.1,       // each consecutive near-miss adds 0.1x

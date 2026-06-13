@@ -15,6 +15,7 @@ export interface ShiftStats {
   diverted: number
   raged: number
   leftInAir: number
+  rerouted: number
   nearMisses: number
   bestStreak: number
   longestHoldSeconds: number
@@ -77,6 +78,8 @@ export interface GameState {
   warning: { text: string; msLeft: number } | null
   /** everything freezes while true; rendering continues */
   paused: boolean
+  /** fog "close one runway" is awaiting the player's runway click */
+  runwayPick: { durationSeconds: number } | null
 }
 
 export function newGameState(seed: number | string): GameState {
@@ -114,6 +117,7 @@ export function newGameState(seed: number | string): GameState {
     nearMissesEnabled: true,
     warning: null,
     paused: false,
+    runwayPick: null,
   }
 }
 
@@ -126,6 +130,7 @@ export function newStats(): ShiftStats {
     diverted: 0,
     raged: 0,
     leftInAir: 0,
+    rerouted: 0,
     nearMisses: 0,
     bestStreak: 0,
     longestHoldSeconds: 0,

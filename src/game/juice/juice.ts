@@ -17,6 +17,7 @@ export function applyJuice(state: GameState): void {
   for (const event of state.juiceEvents) {
     switch (event.type) {
       case 'spawned':
+      case 'rerouted':
         playRadioBlip()
         break
       case 'landed':

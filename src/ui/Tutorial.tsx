@@ -60,8 +60,9 @@ const SLIDES: Slide[] = [
     body: (
       <>
         Traffic comes in waves: rush hours at {yellow('7–9, 11–1, 3–5 and 7–9')}. Events will
-        force quick choices under a countdown. Near-misses build a {green('streak bonus')} — if
-        you keep everyone alive.
+        force quick choices under a countdown. Stuck with nowhere to land?{' '}
+        {blue('Click a selected plane again')} to re-route it to another airport. Near-misses
+        build a {green('streak bonus')} — if you keep everyone alive.
       </>
     ),
   },

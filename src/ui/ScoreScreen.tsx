@@ -72,6 +72,11 @@ export function ScoreScreen() {
             {complaints} customer complaint{complaints === 1 ? '' : 's'}
           </div>
         )}
+        {stats.rerouted > 0 && (
+          <div style={{ color: '#94a3b8' }}>
+            {stats.rerouted} re-routed to other airports
+          </div>
+        )}
         <div style={{ color: '#94a3b8' }}>
           ops score {Math.round(stats.score)} — {stats.departed} departed, {stats.landed} landed
         </div>

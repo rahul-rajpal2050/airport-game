@@ -499,4 +499,23 @@ function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
       ctx.fillText(`RADAR: ${next.def.name} in ${Math.ceil(next.inSeconds)}s`, width / 2, pad + 48)
     }
   }
+
+  // fog "close one runway": prompt the player to pick a strip
+  if (state.runwayPick) {
+    ctx.fillStyle = COLORS.planeWarning
+    ctx.font = `bold ${CONFIG.ui.hudFontSize + 2}px monospace`
+    ctx.textAlign = 'center'
+    ctx.fillText('FOG ROLLING IN — CLICK A RUNWAY TO CLOSE', width / 2, pad + 88)
+  }
+
+  // stranded wide-body: a large plane is up but no large runway is open
+  const strandedLarge =
+    state.planes.some((p) => p.size === 'large' && p.isAirborneControllable) &&
+    !state.runways.some((r) => r.size === 'large' && state.shiftTime >= r.closedUntil)
+  if (strandedLarge) {
+    ctx.fillStyle = COLORS.planeCritical
+    ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
+    ctx.textAlign = 'center'
+    ctx.fillText('no large runway open — click a selected plane again to re-route', width / 2, pad + 106)
+  }
 }
