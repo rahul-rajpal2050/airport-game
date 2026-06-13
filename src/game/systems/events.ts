@@ -256,15 +256,22 @@ export function applyRunwayPick(state: GameState, runway: Runway): void {
   state.runwayPick = null
 }
 
+/** A circling plane can be diverted only while its fuel is still healthy */
+export function canReroute(plane: Plane): boolean {
+  return plane.isAirborneControllable && plane.fuel > CONFIG.scoring.rerouteMinFuelPct
+}
+
 /**
  * Send an airborne plane to another airport: clears it from the airspace via the
  * diverted sweep but as a deliberate operational call — ops-score cost, no
- * complaint, no satisfaction hit. The escape valve when no legal runway is open.
+ * complaint, no satisfaction hit. Allowed only above the fuel threshold: once a
+ * plane is low it's committed. Returns whether the divert happened.
  */
-export function reroutePlane(state: GameState, plane: Plane): void {
-  if (!plane.isAirborneControllable) return
+export function reroutePlane(state: GameState, plane: Plane): boolean {
+  if (!canReroute(plane)) return false
   plane.assignedRunway?.removeFromQueue(plane)
   plane.assignedGate?.release()
   plane.transition('diverted') // reuses the post-tick sweep that removes the plane
   state.events.push({ type: 'rerouted', plane })
+  return true
 }

@@ -7,6 +7,7 @@ import { Runway } from '../entities/runway'
 import { newGameState, type GameState } from '../state'
 import {
   applyRunwayPick,
+  canReroute,
   consumeRiskRoll,
   fuelMultiplier,
   generateEventSchedule,
@@ -145,6 +146,22 @@ describe('effect application', () => {
     expect(state.stats.rerouted).toBe(1)
     expect(state.stats.diverted).toBe(0) // no complaint
     expect(state.stats.score).toBe(-CONFIG.scoring.reroutePenalty)
+  })
+
+  it('re-route is blocked once fuel drops to or below the threshold', () => {
+    const state = makeState()
+    const plane = holdingPlane(1)
+    plane.fuel = CONFIG.scoring.rerouteMinFuelPct // exactly at the line = too low
+    state.planes = [plane]
+    expect(canReroute(plane)).toBe(false)
+    expect(reroutePlane(state, plane)).toBe(false)
+    expect(plane.state).toBe('holding') // not diverted
+    expect(state.events.some((e) => e.type === 'rerouted')).toBe(false)
+
+    plane.fuel = CONFIG.scoring.rerouteMinFuelPct + 1 // just above = allowed
+    expect(canReroute(plane)).toBe(true)
+    expect(reroutePlane(state, plane)).toBe(true)
+    expect(plane.state).toBe('diverted')
   })
 
   it('re-route only applies to airborne planes', () => {

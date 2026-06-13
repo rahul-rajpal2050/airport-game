@@ -1,6 +1,6 @@
 import { CONFIG } from '../config'
 import { playBuzz } from './juice/audio'
-import { applyRunwayPick, reroutePlane } from './systems/events'
+import { applyRunwayPick, canReroute, reroutePlane } from './systems/events'
 import type { GameState } from './state'
 
 const WARNING_MS = 2200
@@ -37,10 +37,18 @@ export function attachInput(canvas: HTMLCanvasElement, getState: () => GameState
       }
     }
     if (nearest) {
-      // re-clicking an already-selected airborne plane re-routes it to another airport
+      // re-clicking an already-selected airborne plane diverts it to another airport
       if (nearest.id === state.selectedPlaneId && nearest.isAirborneControllable) {
-        reroutePlane(state, nearest)
-        state.selectedPlaneId = null
+        if (canReroute(nearest)) {
+          reroutePlane(state, nearest)
+          state.selectedPlaneId = null
+        } else {
+          state.warning = {
+            text: `${nearest.callsign} fuel too low to divert`,
+            msLeft: WARNING_MS,
+          }
+          playBuzz()
+        }
         return
       }
       state.selectedPlaneId = nearest.id

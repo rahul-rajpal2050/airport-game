@@ -419,6 +419,7 @@ export const CONFIG = {
     lateMultiplierPerSecond: 0.005,  // departure payout reduction per second late
     overdueDripPerSecond: 2,         // score bleed while a boarding plane sits overdue
     reroutePenalty: 100,             // ops-score cost to send a plane to another airport (no complaint)
+    rerouteMinFuelPct: 50,           // can only divert while fuel is above this — commit once it's low
     ragePenalty: 150,                // patience hit zero (fires once per plane)
     nearMissBonus: 25,
     streakMultiplierStep: 0.1,       // each consecutive near-miss adds 0.1x
