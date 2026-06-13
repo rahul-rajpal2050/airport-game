@@ -2,6 +2,7 @@ import { useEffect, useRef, useSyncExternalStore, type CSSProperties } from 'rea
 import { getState, returnToMenu, startLoop, stopLoop, togglePause } from '../game/loop'
 import { getUi, isCampaignActive } from '../game/meta/campaign'
 import { gameStore } from '../game/state'
+import { DivertDialog } from './DivertDialog'
 import { EventDialog } from './EventDialog'
 import { Menu } from './Menu'
 import { buttonStyle, overlayStyle, secondaryButtonStyle } from './overlay'
@@ -34,7 +35,7 @@ function PostShift() {
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   useSyncExternalStore(gameStore.subscribe, gameStore.getSnapshot)
-  const { phase, pendingEvent, paused } = getState()
+  const { phase, pendingEvent, paused, divertPlaneId } = getState()
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -43,7 +44,7 @@ export default function App() {
     return () => stopLoop()
   }, [])
 
-  const showPauseButton = phase === 'active' && !paused && !pendingEvent
+  const showPauseButton = phase === 'active' && !paused && !pendingEvent && divertPlaneId === null
   return (
     <div style={{ position: 'relative' }}>
       <canvas ref={canvasRef} style={{ touchAction: 'none' }} />
@@ -55,6 +56,7 @@ export default function App() {
       {phase === 'pre_shift' && <Menu />}
       {phase === 'post_shift' && <PostShift />}
       {phase === 'active' && pendingEvent && <EventDialog />}
+      {phase === 'active' && divertPlaneId !== null && <DivertDialog />}
       {phase === 'active' && paused && <PausedOverlay />}
     </div>
   )
@@ -62,7 +64,7 @@ export default function App() {
 
 const pauseButtonStyle: CSSProperties = {
   position: 'absolute',
-  top: 8,
+  top: 180, // clear of the top HUD (clock / satisfaction readouts)
   right: 8,
   fontFamily: 'monospace',
   fontSize: 18,

@@ -80,6 +80,8 @@ export interface GameState {
   paused: boolean
   /** fog "close one runway" is awaiting the player's runway click */
   runwayPick: { durationSeconds: number } | null
+  /** double-clicked a circling plane: confirm divert dialog for this plane id */
+  divertPlaneId: number | null
 }
 
 export function newGameState(seed: number | string): GameState {
@@ -118,6 +120,7 @@ export function newGameState(seed: number | string): GameState {
     warning: null,
     paused: false,
     runwayPick: null,
+    divertPlaneId: null,
   }
 }
 

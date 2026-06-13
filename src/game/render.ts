@@ -517,7 +517,7 @@ function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
     ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
     ctx.textAlign = 'center'
     ctx.fillText(
-      `no large runway open — click a selected plane again to divert (fuel > ${CONFIG.scoring.rerouteMinFuelPct}%)`,
+      `no large runway open — double-click a plane to divert (fuel > ${CONFIG.scoring.rerouteMinFuelPct}%)`,
       width / 2,
       pad + 106
     )
