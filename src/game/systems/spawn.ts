@@ -68,10 +68,17 @@ export function generateSchedule(rng: RNG, rateMult = 1): SpawnEntry[] {
   }
 
   let t = 0
+  let first = true
   for (;;) {
     const rate = rateAt(t, curve) * rateMult
     const meanInterval = 60 / rate
-    t += meanInterval * (0.5 + rng.next()) // jittered around the mean
+    if (first) {
+      // the opening arrival lands quickly so there's no dead gap at shift start
+      t += rng.float(CONFIG.shift.firstArrivalSeconds[0], CONFIG.shift.firstArrivalSeconds[1])
+      first = false
+    } else {
+      t += meanInterval * (0.5 + rng.next()) // jittered around the mean
+    }
     if (t >= durationSeconds) break
     entries.push(rollEntry(t))
 

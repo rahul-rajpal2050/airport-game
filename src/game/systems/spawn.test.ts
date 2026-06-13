@@ -43,6 +43,15 @@ describe('generateSchedule', () => {
     expect(foundGroup).toBe(true)
   })
 
+  it('the first plane arrives within the opening window', () => {
+    const [lo, hi] = CONFIG.shift.firstArrivalSeconds
+    for (let seed = 0; seed < 15; seed++) {
+      const schedule = generateSchedule(new RNG(seed))
+      expect(schedule[0].time).toBeGreaterThanOrEqual(lo)
+      expect(schedule[0].time).toBeLessThanOrEqual(hi)
+    }
+  })
+
   it('fuel stays within jitter bounds', () => {
     const { initialFuel } = CONFIG.plane
     const { fuelJitter } = CONFIG.approach

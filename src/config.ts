@@ -86,6 +86,7 @@ export const CONFIG = {
     // over durationSeconds (06:00-22:00 in 5 minutes ≈ 18.75s per in-game hour).
     dayStartHour: 6,
     dayEndHour: 22,
+    firstArrivalSeconds: [3, 6] as [number, number], // get the player into it fast
     // formation waves: during rush-level traffic, arrivals can bunch up
     groupProbability: 0.3,        // chance a rush spawn brings company
     groupRushThreshold: 5,        // planes/min at or above which groups can form
