@@ -95,7 +95,15 @@ export function returnToMenu(): void {
   gameStore.notify()
 }
 
+/** Space / P / Esc, or the on-screen button. Freezes everything; rendering continues. */
+export function togglePause(): void {
+  if (state.phase !== 'active') return
+  state.paused = !state.paused
+  gameStore.notify()
+}
+
 function update(dt: number): void {
+  if (state.paused) return
   if (state.shakeMs > 0) state.shakeMs = Math.max(0, state.shakeMs - dt * 1000)
   if (state.warning) {
     state.warning.msLeft -= dt * 1000
@@ -145,11 +153,22 @@ function loop(timestamp: number): void {
   rafId = requestAnimationFrame(loop)
 }
 
+function onPauseKey(e: KeyboardEvent): void {
+  if (e.code === 'Space' || e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+    // don't pause while typing a leaderboard name or feedback message
+    const target = e.target as HTMLElement | null
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+    e.preventDefault()
+    togglePause()
+  }
+}
+
 export function startLoop(el: HTMLCanvasElement): void {
   canvas = el
   ctx = canvas.getContext('2d')!
   resize()
   window.addEventListener('resize', resize)
+  window.addEventListener('keydown', onPauseKey)
   detachInput = attachInput(canvas, getState)
   lastTime = performance.now()
   rafId = requestAnimationFrame(loop)
@@ -163,6 +182,7 @@ export function startLoop(el: HTMLCanvasElement): void {
 export function stopLoop(): void {
   cancelAnimationFrame(rafId)
   window.removeEventListener('resize', resize)
+  window.removeEventListener('keydown', onPauseKey)
   detachInput?.()
   detachInput = null
 }

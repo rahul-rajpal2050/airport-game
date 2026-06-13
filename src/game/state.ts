@@ -75,6 +75,8 @@ export interface GameState {
   nearMissesEnabled: boolean
   /** transient HUD warning (size-rule violations); msLeft ticks on wall-clock */
   warning: { text: string; msLeft: number } | null
+  /** everything freezes while true; rendering continues */
+  paused: boolean
 }
 
 export function newGameState(seed: number | string): GameState {
@@ -111,6 +113,7 @@ export function newGameState(seed: number | string): GameState {
     hudReputation: null,
     nearMissesEnabled: true,
     warning: null,
+    paused: false,
   }
 }
 
