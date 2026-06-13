@@ -14,7 +14,7 @@ describe('storage', () => {
   it('round-trips a save', () => {
     const data = emptySave()
     data.records.bestShiftScore = 4200
-    data.run = { runSeed: 'run-1', shiftIndex: 2, reputation: 60, perkIds: ['weather_radar'], runScore: 9000 }
+    data.run = { runSeed: 'run-1', shiftIndex: 2, reputation: 60, perkIds: ['weather_radar'], runScore: 9000, satisfactionSum: 180 }
     persistSave(data)
     expect(loadSave()).toEqual(data)
   })

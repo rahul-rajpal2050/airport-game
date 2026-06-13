@@ -2,6 +2,8 @@ import { CONFIG, identityModifiers, type Modifiers, type PerkDef, type ShiftArch
 import { dailySeed, RNG, randomSessionSeed } from '../../utils/rng'
 import { onShiftEnd, returnToMenu, startShift } from '../loop'
 import { gameStore, type ShiftStats } from '../state'
+import { satisfactionOf } from '../systems/scoring'
+import { submitScore } from './leaderboard'
 import { emptySave, loadSave, persistSave, type RunState, type SaveData, type Settings } from './storage'
 
 onShiftEnd((stats) => processShiftEnd(stats))
@@ -107,6 +109,7 @@ export function startRun(): void {
     reputation: CONFIG.reputation.initial,
     perkIds: [],
     runScore: 0,
+    satisfactionSum: 0,
   }
   persistSave(save)
   beginShift()
@@ -156,6 +159,7 @@ export function processShiftEnd(stats: ShiftStats): void {
     Math.min(CONFIG.reputation.max, run.reputation + delta)
   )
   run.runScore += stats.score
+  run.satisfactionSum += satisfactionOf(stats)
   run.shiftIndex++
   save.records.bestShiftScore = Math.max(save.records.bestShiftScore, stats.score)
 
@@ -187,6 +191,23 @@ function finishRun(): void {
   save.records.bestRunScore = Math.max(save.records.bestRunScore, run.runScore)
   if (ui?.outcome === 'victory') save.records.runsCompleted++
   persistSave(save)
+}
+
+/** Average satisfaction across the shifts played this run (0 if none) */
+export function runAvgSatisfaction(run: RunState): number {
+  return run.shiftIndex > 0 ? Math.round(run.satisfactionSum / run.shiftIndex) : 0
+}
+
+/** Post the completed run total to the leaderboard under the saved player name */
+export function submitRun(): Promise<boolean> {
+  const run = save.run
+  if (!run) return Promise.resolve(false)
+  return submitScore({
+    name: save.settings.playerName || 'Pilot',
+    satisfaction: runAvgSatisfaction(run),
+    opsScore: run.runScore,
+    seed: run.runSeed, // 'run-...' seed keeps these in All-Time, out of the daily board
+  })
 }
 
 /** Deterministic 3-perk draft for the upcoming shift; excludes owned perks */

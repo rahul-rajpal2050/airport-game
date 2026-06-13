@@ -13,6 +13,7 @@ import {
   processShiftEnd,
   reputationDelta,
   resetCampaign,
+  runAvgSatisfaction,
   startFreeShift,
   startRun,
   updateSettings,
@@ -31,6 +32,20 @@ function statsWith(overrides: Partial<ReturnType<typeof newStats>>) {
 beforeEach(() => {
   setStorageBackend(memoryBackend())
   resetCampaign()
+})
+
+describe('run satisfaction average', () => {
+  it('accumulates each shift and averages over shifts played', () => {
+    startRun()
+    // perfect shift (100%) then a one-complaint shift
+    processShiftEnd(statsWith({ landed: 4, arrivedOnTime: 4, departed: 4, departedOnTime: 4 }))
+    advance() // to draft
+    draftPerk(null) // next shift
+    processShiftEnd(statsWith({ landed: 4, arrivedOnTime: 4, departed: 4, departedOnTime: 4, raged: 1 }))
+    const run = getRun()!
+    // shift 1 = 100, shift 2 = 100 - 5 (one complaint) = 95 -> avg 97.5 -> 98
+    expect(runAvgSatisfaction(run)).toBe(98)
+  })
 })
 
 describe('reputationDelta', () => {

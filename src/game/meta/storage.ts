@@ -6,6 +6,8 @@ export interface RunState {
   reputation: number
   perkIds: string[]
   runScore: number
+  /** sum of each completed shift's satisfaction %, for the run average */
+  satisfactionSum: number
 }
 
 export type Difficulty = 'easy' | 'normal' | 'hard'

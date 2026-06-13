@@ -17,7 +17,7 @@ import type { Difficulty } from '../game/meta/storage'
 import { FeedbackBox } from './FeedbackBox'
 import { Leaderboard } from './Leaderboard'
 import { buttonStyle, overlayStyle, secondaryButtonStyle } from './overlay'
-import { TutorialPrompt, TutorialSlides } from './Tutorial'
+import { NameEntry, TutorialPrompt, TutorialSlides } from './Tutorial'
 
 const toggleStyle: CSSProperties = {
   fontFamily: 'monospace',
@@ -41,31 +41,45 @@ export function Menu() {
   const saved = hasSavedRun()
   const run = getRun()
   const settings = getSettings()
-  const [tutorial, setTutorial] = useState<null | { stage: 'prompt' | 'slides'; then: () => void }>(null)
+  // onboarding: tutorial (first time) -> name entry (until set) -> the chosen action.
+  // replay = HOW TO PLAY, which just shows slides and closes without chaining.
+  const [ob, setOb] = useState<
+    null | { stage: 'prompt' | 'slides' | 'name'; then: () => void; replay?: boolean }
+  >(null)
   const [screen, setScreen] = useState<null | 'leaderboard' | 'feedback'>(null)
 
-  // first start: offer the tutorial once; afterwards actions run directly
   const launch = (action: () => void) => {
     initAudio()
-    if (!settings.tutorialSeen) setTutorial({ stage: 'prompt', then: action })
+    if (!settings.tutorialSeen) setOb({ stage: 'prompt', then: action })
+    else if (!settings.playerName) setOb({ stage: 'name', then: action })
     else action()
   }
-  const finishTutorial = (then: () => void) => {
+  const afterTutorial = (then: () => void, replay?: boolean) => {
     updateSettings({ tutorialSeen: true })
-    setTutorial(null)
+    if (replay) return setOb(null) // HOW TO PLAY: don't chain into name/action
+    if (!getSettings().playerName) return setOb({ stage: 'name', then })
+    setOb(null)
+    then()
+  }
+  const finishName = (then: () => void, name: string) => {
+    updateSettings({ playerName: name })
+    setOb(null)
     then()
   }
 
-  if (tutorial?.stage === 'prompt') {
+  if (ob?.stage === 'prompt') {
     return (
       <TutorialPrompt
-        onYes={() => setTutorial({ ...tutorial, stage: 'slides' })}
-        onNo={() => finishTutorial(tutorial.then)}
+        onYes={() => setOb({ ...ob, stage: 'slides' })}
+        onNo={() => afterTutorial(ob.then, ob.replay)}
       />
     )
   }
-  if (tutorial?.stage === 'slides') {
-    return <TutorialSlides onDone={() => finishTutorial(tutorial.then)} />
+  if (ob?.stage === 'slides') {
+    return <TutorialSlides onDone={() => afterTutorial(ob.then, ob.replay)} />
+  }
+  if (ob?.stage === 'name') {
+    return <NameEntry initial={settings.playerName} onDone={(n) => finishName(ob.then, n)} />
   }
   if (screen === 'leaderboard') return <Leaderboard onClose={() => setScreen(null)} />
   if (screen === 'feedback') return <FeedbackBox onClose={() => setScreen(null)} />
@@ -92,7 +106,7 @@ export function Menu() {
         DAILY CHALLENGE
       </button>
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-        <button style={toggleStyle} onClick={() => setTutorial({ stage: 'slides', then: () => {} })}>
+        <button style={toggleStyle} onClick={() => setOb({ stage: 'slides', then: () => {}, replay: true })}>
           HOW TO PLAY
         </button>
         {backendConfigured() && (

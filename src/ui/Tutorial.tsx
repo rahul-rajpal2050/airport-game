@@ -99,6 +99,47 @@ export function TutorialPrompt(props: { onYes: () => void; onNo: () => void }) {
   )
 }
 
+export function NameEntry(props: { initial: string; onDone: (name: string) => void }) {
+  const [name, setName] = useState(props.initial)
+  return (
+    <div style={overlayStyle}>
+      <div style={{ ...cardStyle, textAlign: 'center' }}>
+        <h2 style={{ fontSize: 20, margin: '0 0 8px', color: '#e2e8f0' }}>NAME FOR THE LEADERBOARD</h2>
+        <p style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.6, margin: '0 0 14px' }}>
+          Your shifts and runs post under this name. Friends compare on the daily challenge.
+        </p>
+        <input
+          autoFocus
+          value={name}
+          maxLength={20}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') props.onDone(name.trim() || 'Pilot')
+          }}
+          placeholder="callsign"
+          style={{
+            fontFamily: 'monospace',
+            fontSize: 16,
+            textAlign: 'center',
+            padding: '10px 12px',
+            width: '70%',
+            background: '#1f2937',
+            color: '#e2e8f0',
+            border: '1px solid #374151',
+            borderRadius: 6,
+            marginBottom: 16,
+          }}
+        />
+        <div>
+          <button style={buttonStyle} onClick={() => props.onDone(name.trim() || 'Pilot')}>
+            CONTINUE
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function TutorialSlides(props: { onDone: () => void }) {
   const [step, setStep] = useState(0)
   const slide = SLIDES[step]
