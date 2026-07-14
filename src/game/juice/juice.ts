@@ -22,6 +22,7 @@ export function applyJuice(state: GameState): void {
         break
       case 'landed':
         playThunk()
+        if (event.plane.golden) playChime() // jackpot sparkle
         break
       case 'near_miss':
         playWhoosh()

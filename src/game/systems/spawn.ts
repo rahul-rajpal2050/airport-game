@@ -10,6 +10,8 @@ export interface SpawnEntry {
   callsign: string
   fuel: number
   size: PlaneSize
+  /** exactly one per shift: pays 5x on each on-time leg */
+  golden?: boolean
 }
 
 /** Piecewise-linear lookup of planes-per-minute at time t */
@@ -101,6 +103,9 @@ export function generateSchedule(rng: RNG, rateMult = 1): SpawnEntry[] {
       t += (60 / rateAfter) * (0.5 + rng.next()) * (groupSize - 1)
     }
   }
+  // exactly one golden flight per shift (seeded draw appended after all others,
+  // so the existing draw order — and every schedule before this point — is unchanged)
+  if (entries.length > 0) entries[rng.int(0, entries.length - 1)].golden = true
   return entries
 }
 
@@ -117,7 +122,7 @@ export function updateSpawns(state: GameState): void {
     state.schedule[state.scheduleIndex].time <= state.shiftTime
   ) {
     const e = state.schedule[state.scheduleIndex++]
-    const plane = new Plane(nextPlaneId++, e.callsign, e.x, e.y, e.fuel, e.time, e.size)
+    const plane = new Plane(nextPlaneId++, e.callsign, e.x, e.y, e.fuel, e.time, e.size, e.golden)
     if (state.nextSpawnKind !== null) {
       plane.kind = state.nextSpawnKind
       state.nextSpawnKind = null

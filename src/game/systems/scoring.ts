@@ -30,12 +30,14 @@ export function applyScoring(state: GameState, dt: number): void {
     switch (event.type) {
       case 'landed': {
         // A:00 - on time iff it touched down within the scheduled arrival window
-        if (state.shiftTime <= event.plane.spawnTime + CONFIG.satisfaction.arrivalWindowSeconds) {
-          state.stats.arrivedOnTime++
-        }
+        const arrivedOnTime =
+          state.shiftTime <= event.plane.spawnTime + CONFIG.satisfaction.arrivalWindowSeconds
+        if (arrivedOnTime) state.stats.arrivedOnTime++
         const frac = Math.max(event.plane.patience / CONFIG.plane.initialPatience, S.minLandingFraction)
         const kindMult = event.plane.kind === 'vip' ? CONFIG.events.vip.scoreMult : 1
-        state.stats.score += Math.round(S.landingBase * frac * kindMult)
+        // golden jackpot: only an ON-TIME landing earns the multiplier
+        const goldenMult = event.plane.golden && arrivedOnTime ? S.goldenMult : 1
+        state.stats.score += Math.round(S.landingBase * frac * kindMult * goldenMult)
         if (
           event.plane.kind === 'medical' &&
           event.plane.kindDeadline !== null &&
@@ -49,10 +51,23 @@ export function applyScoring(state: GameState, dt: number): void {
       case 'departed_ok': {
         const frac = Math.max(1 - event.delaySeconds * S.lateMultiplierPerSecond, S.minLandingFraction)
         const kindMult = event.plane.kind === 'vip' ? CONFIG.events.vip.scoreMult : 1
-        state.stats.score += Math.round(S.departBase * frac * kindMult)
+        const onTime = event.delaySeconds <= S.onTimeThresholdSeconds
+        // on-time combo: consecutive on-time departures multiply the payout; a late one breaks it
+        if (onTime) {
+          state.onTimeCombo++
+          state.stats.bestCombo = Math.max(state.stats.bestCombo, state.onTimeCombo)
+        } else {
+          state.onTimeCombo = 0
+        }
+        const comboMult = onTime
+          ? Math.min(1 + (state.onTimeCombo - 1) * S.comboStep, S.comboMaxMult)
+          : 1
+        // golden jackpot: only an ON-TIME departure earns the multiplier
+        const goldenMult = event.plane.golden && onTime ? S.goldenMult : 1
+        state.stats.score += Math.round(S.departBase * frac * kindMult * goldenMult * comboMult)
         state.stats.departed++
         // D:00 — on time iff it left the gate within the departure window
-        if (event.delaySeconds <= S.onTimeThresholdSeconds) {
+        if (onTime) {
           state.stats.score += S.onTimeBonus
           state.stats.departedOnTime++
         }

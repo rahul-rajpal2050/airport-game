@@ -43,6 +43,15 @@ describe('generateSchedule', () => {
     expect(foundGroup).toBe(true)
   })
 
+  it('exactly one golden flight per shift, deterministic per seed', () => {
+    for (const seed of ['a', 'b', 42]) {
+      const s1 = generateSchedule(new RNG(seed))
+      const s2 = generateSchedule(new RNG(seed))
+      expect(s1.filter((e) => e.golden).length).toBe(1)
+      expect(s1.findIndex((e) => e.golden)).toBe(s2.findIndex((e) => e.golden))
+    }
+  })
+
   it('the first plane arrives within the opening window', () => {
     const [lo, hi] = CONFIG.shift.firstArrivalSeconds
     for (let seed = 0; seed < 15; seed++) {

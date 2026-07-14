@@ -150,6 +150,55 @@ describe('applyScoring', () => {
     expect(state.stats.landed).toBe(2)
   })
 
+  it('golden legs pay 5x only when on time', () => {
+    const state = makeState()
+    const golden = new Plane(1, 'GD100', 0, 0, 100, 0, 'small', true)
+    // on-time landing: within the arrival window
+    state.shiftTime = 10
+    state.events.push({ type: 'landed', plane: golden })
+    applyScoring(state, 0)
+    expect(state.stats.score).toBe(S.landingBase * CONFIG.scoring.goldenMult)
+
+    // late golden departure: normal payout, no jackpot
+    const before = state.stats.score
+    state.events = [{ type: 'departed_ok', plane: golden, delaySeconds: 60 }]
+    applyScoring(state, 0)
+    const lateFrac = Math.max(1 - 60 * S.lateMultiplierPerSecond, S.minLandingFraction)
+    expect(state.stats.score - before).toBe(Math.round(S.departBase * lateFrac))
+  })
+
+  it('on-time combo multiplies departures, caps, and breaks on a late one', () => {
+    const state = makeState()
+    const plane = makePlane()
+    const payout = () => {
+      const before = state.stats.score
+      applyScoring(state, 0)
+      return state.stats.score - before
+    }
+
+    state.events = [{ type: 'departed_ok', plane, delaySeconds: 0 }]
+    expect(payout()).toBe(S.departBase + S.onTimeBonus) // combo x1 = no bonus yet
+    state.events = [{ type: 'departed_ok', plane, delaySeconds: 0 }]
+    expect(payout()).toBe(Math.round(S.departBase * (1 + S.comboStep)) + S.onTimeBonus)
+    expect(state.onTimeCombo).toBe(2)
+
+    // a late departure breaks the combo
+    state.events = [{ type: 'departed_ok', plane, delaySeconds: 60 }]
+    applyScoring(state, 0)
+    expect(state.onTimeCombo).toBe(0)
+    expect(state.stats.bestCombo).toBe(2)
+
+    // cap: drive the combo well past the ceiling
+    for (let i = 0; i < 12; i++) {
+      state.events = [{ type: 'departed_ok', plane, delaySeconds: 0 }]
+      applyScoring(state, 0)
+    }
+    const before = state.stats.score
+    state.events = [{ type: 'departed_ok', plane, delaySeconds: 0 }]
+    applyScoring(state, 0)
+    expect(state.stats.score - before).toBe(Math.round(S.departBase * S.comboMaxMult) + S.onTimeBonus)
+  })
+
   it('tracks the longest hold across landed and diverted planes', () => {
     const state = makeState()
     const quick = makePlane()

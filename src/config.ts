@@ -420,6 +420,9 @@ export const CONFIG = {
     overdueDripPerSecond: 2,         // score bleed while a boarding plane sits overdue
     reroutePenalty: 100,             // ops-score cost to send a plane to another airport (no complaint)
     rerouteMinFuelPct: 50,           // can only divert while fuel is above this — commit once it's low
+    goldenMult: 5,                   // golden flight pays this on each ON-TIME leg (land / depart)
+    comboStep: 0.15,                 // each consecutive on-time departure adds this to the payout mult
+    comboMaxMult: 2,                 // on-time combo payout multiplier cap
     ragePenalty: 150,                // patience hit zero (fires once per plane)
     nearMissBonus: 25,
     streakMultiplierStep: 0.1,       // each consecutive near-miss adds 0.1x
