@@ -21,14 +21,20 @@ export interface Settings {
   playerName: string
 }
 
+export interface Records {
+  bestShiftScore: number
+  bestRunScore: number
+  runsCompleted: number
+  /** best single-shift satisfaction % — the headline personal best */
+  bestSatisfaction: number
+  /** consecutive-day daily-challenge streak */
+  dailyStreak: { count: number; lastDay: string }
+}
+
 export interface SaveData {
   version: 1
   run: RunState | null
-  records: {
-    bestShiftScore: number
-    bestRunScore: number
-    runsCompleted: number
-  }
+  records: Records
   settings: Settings
 }
 
@@ -40,6 +46,16 @@ export function defaultSettings(): Settings {
     runwayCount: 3,
     tutorialSeen: false,
     playerName: '',
+  }
+}
+
+export function defaultRecords(): Records {
+  return {
+    bestShiftScore: 0,
+    bestRunScore: 0,
+    runsCompleted: 0,
+    bestSatisfaction: 0,
+    dailyStreak: { count: 0, lastDay: '' },
   }
 }
 
@@ -70,7 +86,7 @@ export function emptySave(): SaveData {
   return {
     version: 1,
     run: null,
-    records: { bestShiftScore: 0, bestRunScore: 0, runsCompleted: 0 },
+    records: defaultRecords(),
     settings: defaultSettings(),
   }
 }
@@ -81,8 +97,9 @@ export function loadSave(): SaveData {
     if (!raw) return emptySave()
     const parsed = JSON.parse(raw) as SaveData
     if (parsed.version !== 1 || typeof parsed.records !== 'object') return emptySave()
-    // older saves predate settings: fill defaults
+    // older saves predate newer settings/records fields: fill defaults
     parsed.settings = { ...defaultSettings(), ...parsed.settings }
+    parsed.records = { ...defaultRecords(), ...parsed.records }
     return parsed
   } catch {
     return emptySave() // corrupt data: start clean rather than crash

@@ -42,6 +42,7 @@ const COLORS = {
   hudBright: '#e2e8f0',
   streak: '#4ade80',
   vip: '#60a5fa',
+  golden: '#fbbf24',
   slowMoTint: 'rgba(96, 165, 250, 0.07)',
   fuelGreen: '#4ade80',
   fuelBar: '#facc15',
@@ -309,6 +310,7 @@ function planeColor(plane: Plane, shiftTime: number): string {
     // urgent pulse between critical red and white
     return Math.sin(shiftTime * 10) > 0 ? COLORS.planeCritical : COLORS.plane
   }
+  if (plane.golden) return COLORS.golden
   if (plane.kind === 'vip') return COLORS.vip
   if (plane.fuel <= CONFIG.ui.fuelWarningThreshold / 2) return COLORS.planeCritical
   if (plane.fuel <= CONFIG.ui.fuelWarningThreshold) return COLORS.planeWarning
@@ -364,6 +366,10 @@ function drawPlane(ctx: CanvasRenderingContext2D, plane: Plane, selected: boolea
   if (plane.state === 'at_gate') {
     // refuelling / boarding passengers: ghosted out until turnaround completes
     ctx.globalAlpha = 0.45
+  } else if (plane.golden && plane.state !== 'boarding') {
+    // the shift's jackpot flight: always aglow
+    ctx.shadowColor = COLORS.golden
+    ctx.shadowBlur = 10 * scale
   } else if (plane.state === 'boarding' && plane.boardingStart !== null) {
     // ready to depart: pulsing glow, green while fresh, yellow as the window drains
     const remaining = Math.max(
@@ -468,7 +474,8 @@ function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
     state.stats.landed > 0
       ? ` · A:00 ${Math.round((100 * state.stats.arrivedOnTime) / state.stats.landed)}%`
       : ''
-  ctx.fillText(`${airborne} inbound${d00}${a00}`, width / 2, pad + 16)
+  const target = state.hudTarget !== null ? ` · beat ${state.hudTarget}%` : ''
+  ctx.fillText(`${airborne} inbound${d00}${a00}${target}`, width / 2, pad + 16)
 
   if (state.warning) {
     ctx.fillStyle = COLORS.planeWarning
@@ -476,10 +483,16 @@ function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
     ctx.fillText(state.warning.text, width / 2, pad + 70)
   }
 
-  if (state.streak > 0) {
-    ctx.fillStyle = COLORS.streak
+  const line2 = [
+    state.streak > 0 ? `near-miss x${state.streak}` : '',
+    state.onTimeCombo >= 2 ? `on-time x${state.onTimeCombo}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  if (line2) {
+    ctx.fillStyle = state.onTimeCombo >= 2 ? COLORS.golden : COLORS.streak
     ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
-    ctx.fillText(`near-miss x${state.streak}`, width / 2, pad + 32)
+    ctx.fillText(line2, width / 2, pad + 32)
   }
 
   if (state.hudReputation !== null) {

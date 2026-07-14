@@ -1,12 +1,15 @@
 import { CONFIG, identityModifiers, type Modifiers, type PerkDef, type ShiftArchetype } from '../../config'
 import { dailySeed, RNG, randomSessionSeed } from '../../utils/rng'
-import { onShiftEnd, returnToMenu, startShift } from '../loop'
+import { getState, onShiftEnd, returnToMenu, startShift } from '../loop'
 import { gameStore, type ShiftStats } from '../state'
 import { satisfactionOf } from '../systems/scoring'
-import { submitScore } from './leaderboard'
+import { fetchTop, submitScore } from './leaderboard'
 import { emptySave, loadSave, persistSave, type RunState, type SaveData, type Settings } from './storage'
 
-onShiftEnd((stats) => processShiftEnd(stats))
+onShiftEnd((stats) => {
+  recordShiftResult(stats) // every mode: personal bests + daily streak
+  processShiftEnd(stats) // campaign-only bookkeeping
+})
 
 export type CampaignScreen = 'score' | 'draft' | 'summary'
 
@@ -56,7 +59,15 @@ export function updateSettings(patch: Partial<Settings>): void {
  * leaderboard shows raw results, friendly rivalry handles the rest.
  */
 export function startDailyChallenge(): void {
-  startSeededShift(dailySeed())
+  const seed = dailySeed()
+  startSeededShift(seed)
+  // race the leader: show today's top satisfaction in the HUD once it loads
+  void fetchTop({ seed, limit: 1 }).then((rows) => {
+    const state = getState()
+    if (rows && rows.length > 0 && String(state.seed) === seed && state.phase === 'active') {
+      state.hudTarget = rows[0].satisfaction
+    }
+  })
 }
 
 /** One-off shift outside the campaign, honoring difficulty + toggles */
@@ -137,6 +148,48 @@ function beginShift(): void {
   })
 }
 
+export interface LastShiftRecord {
+  isNewBest: boolean
+  prevBestSatisfaction: number
+  /** streak count after this shift, if it was a daily-challenge shift */
+  dailyStreak: number | null
+}
+
+let lastShiftRecord: LastShiftRecord | null = null
+
+export function getLastShiftRecord(): LastShiftRecord | null {
+  return lastShiftRecord
+}
+
+function previousDay(isoDay: string): string {
+  const d = new Date(`${isoDay}T12:00:00Z`) // noon avoids DST edges
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Runs for EVERY completed shift (free, daily, campaign): bests + daily streak */
+export function recordShiftResult(stats: ShiftStats): void {
+  const satisfaction = satisfactionOf(stats)
+  const prevBest = save.records.bestSatisfaction
+  const isNewBest = satisfaction > prevBest
+  if (isNewBest) save.records.bestSatisfaction = satisfaction
+  save.records.bestShiftScore = Math.max(save.records.bestShiftScore, Math.round(stats.score))
+
+  let streakForScreen: number | null = null
+  if (String(getState().seed) === dailySeed()) {
+    const today = dailySeed()
+    const streak = save.records.dailyStreak
+    if (streak.lastDay !== today) {
+      streak.count = streak.lastDay === previousDay(today) ? streak.count + 1 : 1
+      streak.lastDay = today
+    }
+    streakForScreen = streak.count
+  }
+
+  lastShiftRecord = { isNewBest, prevBestSatisfaction: prevBest, dailyStreak: streakForScreen }
+  persistSave(save)
+}
+
 /** Reputation delta from shift stats, scaled by the archetype (VIP Day x2) */
 export function reputationDelta(stats: ShiftStats, archetype: ShiftArchetype): number {
   const R = CONFIG.reputation
@@ -161,7 +214,7 @@ export function processShiftEnd(stats: ShiftStats): void {
   run.runScore += stats.score
   run.satisfactionSum += satisfactionOf(stats)
   run.shiftIndex++
-  save.records.bestShiftScore = Math.max(save.records.bestShiftScore, stats.score)
+  // bestShiftScore is handled by recordShiftResult for every mode
 
   const fired = run.reputation <= CONFIG.reputation.min
   const victory = !fired && run.shiftIndex >= CONFIG.campaign.shiftsPerRun

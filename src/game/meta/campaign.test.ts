@@ -9,15 +9,20 @@ import {
   getRun,
   getSettings,
   getUi,
+  getLastShiftRecord,
+  getRecords,
   modifiersFor,
   processShiftEnd,
+  recordShiftResult,
   reputationDelta,
   resetCampaign,
   runAvgSatisfaction,
+  startDailyChallenge,
   startFreeShift,
   startRun,
   updateSettings,
 } from './campaign'
+import { dailySeed } from '../../utils/rng'
 import { setStorageBackend, type StorageBackend } from './storage'
 
 function memoryBackend(): StorageBackend {
@@ -32,6 +37,56 @@ function statsWith(overrides: Partial<ReturnType<typeof newStats>>) {
 beforeEach(() => {
   setStorageBackend(memoryBackend())
   resetCampaign()
+})
+
+describe('personal bests and daily streak', () => {
+  const perfect = () => statsWith({ landed: 5, arrivedOnTime: 5, departed: 5, departedOnTime: 5 })
+  const mediocre = () => statsWith({ landed: 5, arrivedOnTime: 5, departed: 5, departedOnTime: 5, raged: 4 }) // 80%
+
+  it('detects a new best, then measures the shortfall against it', () => {
+    startFreeShift()
+    recordShiftResult(perfect()) // 100%
+    expect(getLastShiftRecord()!.isNewBest).toBe(true)
+    expect(getRecords().bestSatisfaction).toBe(100)
+
+    recordShiftResult(mediocre()) // 80% < 100%
+    const rec = getLastShiftRecord()!
+    expect(rec.isNewBest).toBe(false)
+    expect(rec.prevBestSatisfaction).toBe(100)
+    expect(getRecords().bestSatisfaction).toBe(100)
+  })
+
+  it('free shifts never touch the daily streak', () => {
+    startFreeShift()
+    recordShiftResult(perfect())
+    expect(getRecords().dailyStreak.count).toBe(0)
+    expect(getLastShiftRecord()!.dailyStreak).toBeNull()
+  })
+
+  it('daily streak: first day, same-day replay, consecutive day, and gap reset', () => {
+    const today = dailySeed()
+    const yesterday = (() => {
+      const d = new Date(`${today}T12:00:00Z`)
+      d.setUTCDate(d.getUTCDate() - 1)
+      return d.toISOString().slice(0, 10)
+    })()
+
+    startDailyChallenge()
+    recordShiftResult(perfect())
+    expect(getRecords().dailyStreak).toEqual({ count: 1, lastDay: today })
+
+    recordShiftResult(perfect()) // same-day replay: unchanged
+    expect(getRecords().dailyStreak.count).toBe(1)
+
+    getRecords().dailyStreak.count = 3
+    getRecords().dailyStreak.lastDay = yesterday // pretend last play was yesterday
+    recordShiftResult(perfect())
+    expect(getRecords().dailyStreak).toEqual({ count: 4, lastDay: today })
+
+    getRecords().dailyStreak.lastDay = '2020-01-01' // long gap: reset
+    recordShiftResult(perfect())
+    expect(getRecords().dailyStreak).toEqual({ count: 1, lastDay: today })
+  })
 })
 
 describe('run satisfaction average', () => {

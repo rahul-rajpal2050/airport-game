@@ -104,6 +104,9 @@ export function Menu() {
       </button>
       <button style={secondaryButtonStyle} onClick={() => launch(startDailyChallenge)}>
         DAILY CHALLENGE
+        {records.dailyStreak.count > 0 && (
+          <span style={{ color: '#facc15' }}> — DAY {records.dailyStreak.count} STREAK</span>
+        )}
       </button>
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
         <button style={toggleStyle} onClick={() => setOb({ stage: 'slides', then: () => {}, replay: true })}>

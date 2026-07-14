@@ -18,6 +18,7 @@ export interface ShiftStats {
   rerouted: number
   nearMisses: number
   bestStreak: number
+  bestCombo: number
   longestHoldSeconds: number
   longestHoldCallsign: string
   worstDelaySeconds: number
@@ -72,6 +73,10 @@ export interface GameState {
   modifiers: Modifiers
   /** campaign reputation shown in the HUD, null in free-shift mode */
   hudReputation: number | null
+  /** daily challenge: today's leaderboard-leading satisfaction to beat, if any */
+  hudTarget: number | null
+  /** consecutive on-time departures; any late departure resets it */
+  onTimeCombo: number
   /** settings toggle: near-miss detection (slow-mo, streaks) */
   nearMissesEnabled: boolean
   /** transient HUD warning (size-rule violations); msLeft ticks on wall-clock */
@@ -116,6 +121,8 @@ export function newGameState(seed: number | string): GameState {
     nextRolloutMult: 1,
     modifiers: identityModifiers(),
     hudReputation: null,
+    hudTarget: null,
+    onTimeCombo: 0,
     nearMissesEnabled: true,
     warning: null,
     paused: false,
@@ -136,6 +143,7 @@ export function newStats(): ShiftStats {
     rerouted: 0,
     nearMisses: 0,
     bestStreak: 0,
+    bestCombo: 0,
     longestHoldSeconds: 0,
     longestHoldCallsign: '',
     worstDelaySeconds: 0,
