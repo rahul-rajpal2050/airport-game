@@ -60,11 +60,21 @@ export function ScoreScreen() {
     ]
     if (record?.dailyStreak) lines.push(`🔥 day ${record.dailyStreak} streak`)
     lines.push(GAME_URL)
+    const text = lines.join('\n')
     try {
-      await navigator.clipboard.writeText(lines.join('\n'))
+      await navigator.clipboard.writeText(text)
       setCopied(true)
     } catch {
-      // clipboard unavailable (permissions): leave the button as-is
+      // clipboard API blocked: legacy execCommand fallback
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.select()
+      try {
+        if (document.execCommand('copy')) setCopied(true)
+      } finally {
+        ta.remove()
+      }
     }
   }
   return (

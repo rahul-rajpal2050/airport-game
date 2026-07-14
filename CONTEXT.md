@@ -81,6 +81,13 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
 
 ## Recent Changes
+[2026-07-14] Addictiveness pass: personal bests (NEW PERSONAL BEST / "N% short of
+your best" on score screen, records.bestSatisfaction, recorder now runs for ALL
+modes), daily-challenge day streak (menu + score screen), live "beat NN%" HUD
+target fetched from today's board, COPY RESULT share card (emoji block + link,
+clipboard with execCommand fallback), golden flight (1/shift, seeded, gold glow,
+5x per on-time leg), on-time departure combo (+15%/step, 2x cap, breaks on late,
+HUD + best-combo stat). 101 tests. Deployed.
 [2026-06-12] Playtest round 2: pause (space/P/esc + button, freezes sim & timers);
 first arrival in 3-6s (kills dead opening gap); audio overhaul (convolver reverb +
 compressor master chain, detuned/filtered voices, browner LFO+waveshaper jet roar —
