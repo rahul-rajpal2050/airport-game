@@ -1,7 +1,7 @@
 # Project Context
 
 ## Overview
-Mobile-first airport tower management game. Player assigns runway slots and gates to incoming planes under time pressure. Core experience: the controlled unraveling of a system — cascading delays, fuel warnings, near-misses, and the dopamine hit of barely pulling it off. Think Flight Control crossed with Papers Please anxiety.
+Laptop/desktop-first airport tower management game. Player assigns runway slots and gates to incoming planes under time pressure. Core experience: the controlled unraveling of a system — cascading delays, fuel warnings, near-misses, and the dopamine hit of barely pulling it off. Think Flight Control crossed with Papers Please anxiety.
 
 ## Tech Stack
 - **Runtime**: Bun
@@ -21,8 +21,11 @@ src/
     loop.ts         -- rAF orchestration, canvas setup, startShift/endShift
     sim.ts          -- Per-tick simulation step (pure, no DOM, headless-testable)
     state.ts        -- GameState, ShiftStats, gameStore (useSyncExternalStore)
-    input.ts        -- Pointer -> logical coords, tap-tap assignment
-    render.ts       -- All canvas drawing
+    input.ts        -- Pointer -> logical coords -> iso hit-testing, tap-tap assignment
+    render.ts       -- All canvas drawing (depth-sorted, iso-projected)
+    iso.ts          -- Projection math: project/unprojectGround, height/bank smoothing.
+                       World stays flat top-down x/y everywhere else — this is the
+                       ONLY place that projects it onto screen.
     entities/
       plane.ts      -- Plane class, full lifecycle state machine, per-state movement
       runway.ts     -- Runway class: mixed arrival/departure FIFO, hold-short, hit-test
@@ -79,8 +82,35 @@ systems/cascade.ts, systems/events.ts, ui/HUD.tsx, ui/EventDialog.tsx
 - **Runway pipeline**: one plane per runway from commit (landing) to roll-out (departed).
   Player enqueues; `runway.sequence()` auto-commits the queue head each frame.
 - Plane state union includes Phase 2 gate states; only Phase 1 transitions are in ALLOWED.
+- **World space vs screen space**: sim/entities/scoring/tests operate ONLY in flat
+  top-down world x/y — this never changed, even after the iso visual pass. `iso.ts` is
+  the sole projection boundary. Ground entities (runway/gate) hit-test by unprojecting
+  the click back to world space and calling their existing `containsPoint(wx,wy)`.
+  Planes hit-test in SCREEN space instead (project the plane, compare to the raw click)
+  since they carry real altitude now. Depth sort key is world Y alone (see below —
+  NOT x+y; that was the rejected diamond-shear approach).
 
 ## Recent Changes
+[2026-07-16] 2.5D visual pass (GDD roadmap item 6, done): new `iso.ts` projects world
+x/y onto screen as a TILTED ORTHOGRAPHIC view (screenX=wx*scaleX+originX,
+screenY=wy*scaleY-height+originY) — deliberately NOT a diagonal-shear diamond
+isometric. Tried the diamond version first; live-tested it and rejected it — the
+world layout (V-terminal, runway row) is mirror-symmetric about a vertical world
+axis, and a shear-based formula only preserves that symmetry if the map is laid
+out around the shear's diagonals, which ours isn't. The diamond version rendered
+the V's two arms lopsided (one nearly vertical, one nearly horizontal) — a real bug,
+not a tuning issue. Pure per-axis scaling fixed it instantly and still delivers real
+plane altitude (ground shadow separately projected at height 0, smooth glide-down/
+climb-out via a render-only WeakMap easing cache), banking on turns (heading-delta
+-> sprite squish), depth-sorted draw order (single list, sorted by world Y, covering
+runways/terminal/gates/planes), and extruded "3D block" side-faces on runways/
+terminal/gates. Sim, entities, scoring, and all 109 pre-existing tests are
+completely untouched — this was purely `render.ts` + `input.ts` + new `iso.ts`.
+Verified live: click-to-select (screen-space plane hit-test) and click-to-assign
+(ground unprojection -> existing containsPoint) both confirmed working via real
+dispatched pointer events through the actual input.ts handler, not just visually.
+Known minor cosmetic seam: the two terminal-arm extrusions' side-faces overlap
+slightly at the shared V apex (small dark chevron) — not fixed, flagged as polish.
 [2026-07-14] Addictiveness pass: personal bests (NEW PERSONAL BEST / "N% short of
 your best" on score screen, records.bestSatisfaction, recorder now runs for ALL
 modes), daily-challenge day streak (menu + score screen), live "beat NN%" HUD
@@ -161,10 +191,14 @@ Dev console handle window.__game (DEV only) for feel-tuning.
   are deterministic/replayable — this is the hook Phase 5 daily runs will reuse.
   Campaign controller (src/game/meta/campaign.ts) registers via loop.onShiftEnd;
   the sim stays campaign-agnostic. Free Shift mode unchanged.
-- Tests: 63 across 8 files; determinism contract holds with events, risk lottery,
-  and perk modifiers active
-- Git: clean history, one commit per feature
-- Next: Phase 5 daily challenge + leaderboard (Supabase), then Phase 6 visual
-  overhaul (2.5D isometric, laptop-first)
+- Tests: 109 across 10 files (was 63 as of the events milestone; grew through the
+  meta/leaderboard/addictiveness/iso passes); determinism contract holds throughout
+- Git: clean history, one commit per feature; deployed to GitHub Pages after each
+  verified batch (see reference_deployment memory for the live URL + redeploy steps)
+- All six GDD roadmap build-order items are now ✅ (V-terminal/size classes/fuel →
+  vertical runways/refuel visuals → 24h clock/day-night → satisfaction scoring →
+  daily challenge/leaderboard/addictiveness loop → 2.5D visual pass). Remaining
+  open threads: the terminal-apex extrusion seam (cosmetic), and a possible future
+  full diamond-isometric map redesign if the tilted-orthographic look isn't enough
 - Known artifact (harmless): jumping shiftTime via __game dumps all spawns in one
   tick and farms near-miss streaks — impossible in real play, ignore in dev tests

@@ -2,6 +2,16 @@ import { CONFIG, clockHourAt } from '../config'
 import type { Gate } from './entities/gate'
 import type { Plane } from './entities/plane'
 import type { Runway } from './entities/runway'
+import {
+  frontEdge,
+  getHeight,
+  project,
+  projectCircleRadii,
+  projectCorners,
+  updateBank,
+  updateHeight,
+  type ScreenPoint,
+} from './iso'
 import type { GameState } from './state'
 import { upcomingEvent } from './systems/events'
 import { satisfactionOf } from './systems/scoring'
@@ -26,8 +36,11 @@ const COLORS = {
   apronEdge: 'rgba(74, 85, 104, 0.35)',
   shadow: 'rgba(0, 0, 0, 0.35)',
   runway: '#2a3142',
+  runwaySide: '#171b26',
   runwayStripe: '#4a5568',
   terminal: '#1a2030',
+  terminalSide: '#0e1119',
+  gateSide: 'rgba(30, 41, 59, 0.6)',
   gateFree: 'rgba(148, 163, 184, 0.4)',
   gateReserved: '#60a5fa',
   gateOccupied: '#334155',
@@ -98,7 +111,9 @@ function drawBackground(ctx: CanvasRenderingContext2D, hour: number, nightness: 
   ctx.fillStyle = bgGradient
   ctx.fillRect(0, 0, width, height)
 
-  // apron: the paved field around runways and the V-terminal, dimmed at night
+  // apron: the paved field around runways and the V-terminal, dimmed at night.
+  // Kept as a flat screen-space backdrop (not projected) — a simple ground wash
+  // behind the projected buildings, same as the sky.
   ctx.globalAlpha = 1 - 0.35 * nightness
   ctx.fillStyle = COLORS.apron
   ctx.strokeStyle = COLORS.apronEdge
@@ -118,6 +133,86 @@ function drawBackground(ctx: CanvasRenderingContext2D, hour: number, nightness: 
   ctx.fillRect(0, 0, width, height)
 }
 
+// ---- world-space geometry helpers (rotated quads projected onto the iso grid) ----
+
+interface WorldPoint {
+  x: number
+  y: number
+}
+
+function localToWorld(center: WorldPoint, angleDeg: number, alongLength: number, alongWidth: number): WorldPoint {
+  const a = angleDeg * DEG
+  const dirX = Math.cos(a)
+  const dirY = Math.sin(a)
+  const perpX = -dirY
+  const perpY = dirX
+  return { x: center.x + dirX * alongLength + perpX * alongWidth, y: center.y + dirY * alongLength + perpY * alongWidth }
+}
+
+/** Consistent winding rectangle corners — used for runways, the terminal ribbon, and gates (angle 0) */
+function quadCorners(center: WorldPoint, angleDeg: number, length: number, width: number): WorldPoint[] {
+  const halfL = length / 2
+  const halfW = width / 2
+  return [
+    localToWorld(center, angleDeg, -halfL, -halfW),
+    localToWorld(center, angleDeg, halfL, -halfW),
+    localToWorld(center, angleDeg, halfL, halfW),
+    localToWorld(center, angleDeg, -halfL, halfW),
+  ]
+}
+
+/** Fills a projected quad's extruded side face (front edge only) then its top face */
+function drawExtrudedQuad(
+  ctx: CanvasRenderingContext2D,
+  worldCorners: WorldPoint[],
+  topFill: string,
+  sideFill: string,
+  extrusionPx: number,
+  strokeStyle?: string,
+  strokeWidth = 1
+): ScreenPoint[] {
+  const screenCorners = projectCorners(worldCorners)
+  if (extrusionPx > 0) {
+    const [a, b] = frontEdge(screenCorners)
+    ctx.beginPath()
+    ctx.moveTo(a.x, a.y)
+    ctx.lineTo(b.x, b.y)
+    ctx.lineTo(b.x, b.y + extrusionPx)
+    ctx.lineTo(a.x, a.y + extrusionPx)
+    ctx.closePath()
+    ctx.fillStyle = sideFill
+    ctx.fill()
+  }
+  ctx.beginPath()
+  ctx.moveTo(screenCorners[0].x, screenCorners[0].y)
+  for (let i = 1; i < screenCorners.length; i++) ctx.lineTo(screenCorners[i].x, screenCorners[i].y)
+  ctx.closePath()
+  ctx.fillStyle = topFill
+  ctx.fill()
+  if (strokeStyle) {
+    ctx.strokeStyle = strokeStyle
+    ctx.lineWidth = strokeWidth
+    ctx.stroke()
+  }
+  return screenCorners
+}
+
+function projectedLine(ctx: CanvasRenderingContext2D, a: WorldPoint, b: WorldPoint): void {
+  const pa = project(a.x, a.y, 0)
+  const pb = project(b.x, b.y, 0)
+  ctx.beginPath()
+  ctx.moveTo(pa.x, pa.y)
+  ctx.lineTo(pb.x, pb.y)
+  ctx.stroke()
+}
+
+// ---- draw list: one depth-sorted pass over every ground+air entity ----
+
+interface Drawable {
+  depth: number
+  draw: () => void
+}
+
 export function draw(ctx: CanvasRenderingContext2D, state: GameState): void {
   const { width, height } = CONFIG.canvas
   const hour = clockHourAt(state.shiftTime)
@@ -134,10 +229,30 @@ export function draw(ctx: CanvasRenderingContext2D, state: GameState): void {
   }
 
   drawHoldingRings(ctx, state)
-  drawTerminal(ctx, state.gates)
-  for (const runway of state.runways) drawRunway(ctx, runway, state.shiftTime, nightness)
+
+  const items: Drawable[] = []
+  for (const runway of state.runways) {
+    items.push({
+      depth: runway.y,
+      draw: () => drawRunway(ctx, runway, state.shiftTime, nightness),
+    })
+  }
+  for (const arm of terminalArms(state.gates)) {
+    items.push({ depth: arm.depth, draw: () => drawTerminalArm(ctx, arm) })
+  }
+  for (const gate of state.gates) {
+    items.push({ depth: gate.y, draw: () => drawGate(ctx, gate) })
+  }
+  for (const plane of state.planes) {
+    items.push({
+      depth: plane.y,
+      draw: () => drawPlane(ctx, plane, plane.id === state.selectedPlaneId, state.shiftTime),
+    })
+  }
+  items.sort((a, b) => a.depth - b.depth)
+  for (const item of items) item.draw()
+
   drawAssignmentLines(ctx, state)
-  for (const plane of state.planes) drawPlane(ctx, plane, plane.id === state.selectedPlaneId, state.shiftTime)
   drawHud(ctx, state)
   ctx.restore()
 
@@ -147,50 +262,44 @@ export function draw(ctx: CanvasRenderingContext2D, state: GameState): void {
   }
 }
 
-function drawTerminal(ctx: CanvasRenderingContext2D, gates: Gate[]): void {
-  if (gates.length === 0) return
-  const G = CONFIG.gate
+interface TerminalArm {
+  center: WorldPoint
+  angleDeg: number
+  length: number
+  width: number
+  depth: number
+  gates: Gate[]
+}
 
-  // V-terminal building: two arm strips from the apex out past the last gate
-  ctx.strokeStyle = COLORS.terminal
-  ctx.lineCap = 'round'
-  ctx.lineWidth = G.sizePixels + 18
-  for (const arm of [-1, 1]) {
-    const armGates = gates.filter((g) => (g.id % 2 === 0 ? -1 : 1) === arm)
+function terminalArms(gates: Gate[]): TerminalArm[] {
+  const G = CONFIG.gate
+  const apex = { x: G.apexX, y: G.apexY }
+  const arms: TerminalArm[] = []
+  for (const side of [-1, 1]) {
+    const armGates = gates.filter((g) => (g.id % 2 === 0 ? -1 : 1) === side)
     if (armGates.length === 0) continue
     const outer = armGates[armGates.length - 1]
     const overshoot = 36
-    const dx = outer.x - G.apexX
-    const dy = outer.y - G.apexY
+    const dx = outer.x - apex.x
+    const dy = outer.y - apex.y
     const len = Math.hypot(dx, dy)
-    ctx.beginPath()
-    ctx.moveTo(G.apexX, G.apexY)
-    ctx.lineTo(G.apexX + (dx / len) * (len + overshoot), G.apexY + (dy / len) * (len + overshoot))
-    ctx.stroke()
+    const tip = { x: apex.x + (dx / len) * (len + overshoot), y: apex.y + (dy / len) * (len + overshoot) }
+    const center = { x: (apex.x + tip.x) / 2, y: (apex.y + tip.y) / 2 }
+    arms.push({
+      center,
+      angleDeg: Math.atan2(dy, dx) / DEG,
+      length: len + overshoot,
+      width: G.sizePixels + 18,
+      depth: center.y,
+      gates: armGates,
+    })
   }
-  ctx.lineCap = 'butt'
+  return arms
+}
 
-  ctx.font = `${CONFIG.ui.hudFontSize - 2}px monospace`
-  ctx.textAlign = 'center'
-  for (const gate of gates) {
-    const size = gate.boxSize
-    if (gate.occupied) {
-      ctx.fillStyle = COLORS.gateOccupied
-      ctx.fillRect(gate.x - size / 2, gate.y - size / 2, size, size)
-    } else if (!gate.free) {
-      ctx.strokeStyle = COLORS.gateReserved
-      ctx.lineWidth = 1.5
-      ctx.setLineDash([4, 4])
-      ctx.strokeRect(gate.x - size / 2, gate.y - size / 2, size, size)
-      ctx.setLineDash([])
-    } else {
-      ctx.strokeStyle = gate.size === 'large' ? COLORS.hudBright : COLORS.gateFree
-      ctx.lineWidth = gate.size === 'large' ? 1.5 : 1
-      ctx.strokeRect(gate.x - size / 2, gate.y - size / 2, size, size)
-    }
-    ctx.fillStyle = COLORS.hud
-    ctx.fillText(`G${gate.id + 1}${gate.size === 'large' ? '·L' : ''}`, gate.x, gate.y + size / 2 + 16)
-  }
+function drawTerminalArm(ctx: CanvasRenderingContext2D, arm: TerminalArm): void {
+  const corners = quadCorners(arm.center, arm.angleDeg, arm.length, arm.width)
+  drawExtrudedQuad(ctx, corners, COLORS.terminal, COLORS.terminalSide, CONFIG.iso.buildingExtrusionPx)
 }
 
 function drawHoldingRings(ctx: CanvasRenderingContext2D, state: GameState): void {
@@ -199,37 +308,36 @@ function drawHoldingRings(ctx: CanvasRenderingContext2D, state: GameState): void
   for (const p of state.planes) {
     if (p.state === 'holding') rings = Math.max(rings, p.ringIndex + 1)
   }
+  const center = project(holdingCenterX, holdingCenterY, 0)
   ctx.strokeStyle = COLORS.holdRing
   ctx.lineWidth = 1
   for (let i = 0; i < rings; i++) {
+    const { rx, ry } = projectCircleRadii(holdingRadiusBase + i * holdingRadiusStep)
     ctx.beginPath()
-    ctx.arc(holdingCenterX, holdingCenterY, holdingRadiusBase + i * holdingRadiusStep, 0, Math.PI * 2)
+    ctx.ellipse(center.x, center.y, rx, ry, 0, 0, Math.PI * 2)
     ctx.stroke()
   }
 }
 
-function drawRunway(
-  ctx: CanvasRenderingContext2D,
-  runway: Runway,
-  shiftTime: number,
-  nightness = 0
-): void {
+function drawRunway(ctx: CanvasRenderingContext2D, runway: Runway, shiftTime: number, nightness: number): void {
   const { lengthPixels } = CONFIG.runway
   const widthPixels = runway.width
   const closed = shiftTime < runway.closedUntil
-  ctx.save()
-  ctx.translate(runway.x, runway.y)
-  ctx.rotate(runway.angle * DEG)
+  const center = { x: runway.x, y: runway.y }
+  const halfL = lengthPixels / 2
+  const halfW = widthPixels / 2
 
-  ctx.fillStyle = COLORS.runway
-  ctx.fillRect(-lengthPixels / 2, -widthPixels / 2, lengthPixels, widthPixels)
+  const corners = quadCorners(center, runway.angle, lengthPixels, widthPixels)
+  drawExtrudedQuad(ctx, corners, COLORS.runway, COLORS.runwaySide, CONFIG.iso.groundExtrusionPx)
 
   // edge lights after dark (and at dawn): paired amber dots along both sides
   if (nightness > 0.05) {
     ctx.fillStyle = `rgba(255, 214, 140, ${0.85 * nightness})`
-    for (let x = -lengthPixels / 2 + 8; x <= lengthPixels / 2 - 8; x += 18) {
-      ctx.fillRect(x, -widthPixels / 2 - 3, 2.5, 2.5)
-      ctx.fillRect(x, widthPixels / 2 + 1, 2.5, 2.5)
+    for (let x = -halfL + 8; x <= halfL - 8; x += 18) {
+      for (const wOff of [-halfW - 3, halfW + 1]) {
+        const p = project(localToWorld(center, runway.angle, x, wOff).x, localToWorld(center, runway.angle, x, wOff).y, 0)
+        ctx.fillRect(p.x - 1.25, p.y - 1.25, 2.5, 2.5)
+      }
     }
   }
 
@@ -237,69 +345,116 @@ function drawRunway(
   ctx.strokeStyle = COLORS.runwayStripe
   ctx.lineWidth = 2
   ctx.setLineDash([8, 8])
-  ctx.beginPath()
-  ctx.moveTo(-lengthPixels / 2 + 6, 0)
-  ctx.lineTo(lengthPixels / 2 - 6, 0)
-  ctx.stroke()
+  projectedLine(
+    ctx,
+    localToWorld(center, runway.angle, -halfL + 6, 0),
+    localToWorld(center, runway.angle, halfL - 6, 0)
+  )
   ctx.setLineDash([])
 
   // threshold stripe at touchdown end
+  const stripeCorners = quadCorners(
+    localToWorld(center, runway.angle, -halfL + 2, 0),
+    runway.angle,
+    4,
+    widthPixels
+  )
+  const stripeScreen = projectCorners(stripeCorners)
+  ctx.beginPath()
+  ctx.moveTo(stripeScreen[0].x, stripeScreen[0].y)
+  for (let i = 1; i < stripeScreen.length; i++) ctx.lineTo(stripeScreen[i].x, stripeScreen[i].y)
+  ctx.closePath()
   ctx.fillStyle = COLORS.runwayStripe
-  ctx.fillRect(-lengthPixels / 2, -widthPixels / 2, 4, widthPixels)
+  ctx.fill()
 
-  // size tag at the threshold: L accepts everyone, S is narrow-body only
+  // size tag at the threshold: L accepts everyone, S is narrow-body only (billboarded upright)
+  const tagAnchor = project(localToWorld(center, runway.angle, -halfL - 12, 0).x, localToWorld(center, runway.angle, -halfL - 12, 0).y, 0)
   ctx.fillStyle = runway.size === 'large' ? COLORS.hudBright : COLORS.hud
   ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
   ctx.textAlign = 'center'
-  ctx.fillText(runway.size === 'large' ? 'L' : 'S', -lengthPixels / 2 - 12, 4)
+  ctx.fillText(runway.size === 'large' ? 'L' : 'S', tagAnchor.x, tagAnchor.y + 4)
 
   if (closed) {
-    // diagonal hatching + label
     ctx.strokeStyle = COLORS.planeCritical
     ctx.lineWidth = 2
-    for (let x = -lengthPixels / 2; x < lengthPixels / 2; x += 14) {
-      ctx.beginPath()
-      ctx.moveTo(x, -widthPixels / 2)
-      ctx.lineTo(x + 8, widthPixels / 2)
-      ctx.stroke()
+    for (let x = -halfL; x < halfL; x += 14) {
+      projectedLine(ctx, localToWorld(center, runway.angle, x, -halfW), localToWorld(center, runway.angle, x + 8, halfW))
     }
+    const label = project(center.x, center.y, 0)
     ctx.fillStyle = COLORS.planeCritical
     ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
-    ctx.fillText('CLOSED', 0, -widthPixels / 2 - 6)
+    ctx.fillText('CLOSED', label.x, label.y - halfW * 0.6 - 6)
   } else if (!runway.free) {
+    const outline = quadCorners(center, runway.angle, lengthPixels + 6, widthPixels + 6)
+    const screenOutline = projectCorners(outline)
     ctx.strokeStyle = COLORS.planeCritical
     ctx.lineWidth = 1.5
-    ctx.strokeRect(-lengthPixels / 2 - 3, -widthPixels / 2 - 3, lengthPixels + 6, widthPixels + 6)
+    ctx.beginPath()
+    ctx.moveTo(screenOutline[0].x, screenOutline[0].y)
+    for (let i = 1; i < screenOutline.length; i++) ctx.lineTo(screenOutline[i].x, screenOutline[i].y)
+    ctx.closePath()
+    ctx.stroke()
   }
-  ctx.restore()
 
   // queue count
   if (runway.queue.length > 0) {
+    const anchor = project(center.x, center.y, 0)
     ctx.fillStyle = COLORS.hudBright
     ctx.font = `bold ${CONFIG.ui.hudFontSize}px monospace`
     ctx.textAlign = 'center'
-    ctx.fillText(`+${runway.queue.length}`, runway.x, runway.y + widthPixels + 14)
+    ctx.fillText(`+${runway.queue.length}`, anchor.x, anchor.y + halfW * 0.6 + 14)
   }
+}
+
+function drawGate(ctx: CanvasRenderingContext2D, gate: Gate): void {
+  const size = gate.boxSize
+  const corners = quadCorners({ x: gate.x, y: gate.y }, 0, size, size)
+  let topFill = 'transparent'
+  let strokeStyle: string | undefined
+  let strokeWidth = 1
+  let dash: number[] = []
+  if (gate.occupied) {
+    topFill = COLORS.gateOccupied
+  } else if (!gate.free) {
+    strokeStyle = COLORS.gateReserved
+    strokeWidth = 1.5
+    dash = [4, 4]
+  } else {
+    strokeStyle = gate.size === 'large' ? COLORS.hudBright : COLORS.gateFree
+    strokeWidth = gate.size === 'large' ? 1.5 : 1
+  }
+  ctx.setLineDash(dash)
+  drawExtrudedQuad(ctx, corners, topFill, COLORS.gateSide, CONFIG.iso.gateExtrusionPx, strokeStyle, strokeWidth)
+  ctx.setLineDash([])
+
+  const label = project(gate.x, gate.y, 0)
+  ctx.fillStyle = COLORS.hud
+  ctx.font = `${CONFIG.ui.hudFontSize - 2}px monospace`
+  ctx.textAlign = 'center'
+  ctx.fillText(`G${gate.id + 1}${gate.size === 'large' ? '·L' : ''}`, label.x, label.y + size * 0.15 + 18)
 }
 
 function drawAssignmentLines(ctx: CanvasRenderingContext2D, state: GameState): void {
   ctx.lineWidth = 1
   for (const plane of state.planes) {
+    const planeScreen = project(plane.x, plane.y, getHeight(plane))
     if (plane.isAirborneControllable && plane.assignedRunway) {
+      const target = project(plane.assignedRunway.x, plane.assignedRunway.y, 0)
       ctx.strokeStyle = COLORS.assignLine
       ctx.beginPath()
-      ctx.moveTo(plane.x, plane.y)
-      ctx.lineTo(plane.assignedRunway.x, plane.assignedRunway.y)
+      ctx.moveTo(planeScreen.x, planeScreen.y)
+      ctx.lineTo(target.x, target.y)
       ctx.stroke()
     }
     const showGateLine =
       plane.assignedGate &&
       (plane.isAirborneControllable || plane.state === 'landing' || plane.state === 'rolling')
     if (showGateLine) {
+      const target = project(plane.assignedGate!.x, plane.assignedGate!.y, 0)
       ctx.strokeStyle = COLORS.gateLine
       ctx.beginPath()
-      ctx.moveTo(plane.x, plane.y)
-      ctx.lineTo(plane.assignedGate!.x, plane.assignedGate!.y)
+      ctx.moveTo(planeScreen.x, planeScreen.y)
+      ctx.lineTo(target.x, target.y)
       ctx.stroke()
     }
   }
@@ -317,52 +472,47 @@ function planeColor(plane: Plane, shiftTime: number): string {
   return COLORS.plane
 }
 
+/** On-screen heading angle: projects a short step ahead of the plane and reads the screen-space delta, so anisotropic scaleX/scaleY doesn't distort the sprite's facing */
+function screenHeading(plane: Plane): number {
+  const p0 = project(plane.x, plane.y, 0)
+  const ahead = project(plane.x + Math.cos(plane.heading) * 10, plane.y + Math.sin(plane.heading) * 10, 0)
+  return Math.atan2(ahead.y - p0.y, ahead.x - p0.x)
+}
+
 function drawPlane(ctx: CanvasRenderingContext2D, plane: Plane, selected: boolean, shiftTime: number): void {
   if (plane.state === 'departed' || plane.state === 'diverted') return
-  const { height: h } = CONFIG.plane
   const stuck = plane.state === 'rolling' && plane.rolloutDone && !plane.assignedGate
 
-  ctx.save()
-  ctx.translate(plane.x, plane.y)
+  const heightPx = updateHeight(plane)
+  const bank = updateBank(plane)
+  const heading = screenHeading(plane)
+  const bodyPos = project(plane.x, plane.y, heightPx)
+  const shadowPos = project(plane.x, plane.y, 0)
 
-  if (selected) {
-    ctx.strokeStyle = COLORS.selection
+  if (selected || (stuck && Math.sin(shiftTime * 8) > 0)) {
+    ctx.strokeStyle = selected ? COLORS.selection : COLORS.planeCritical
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.arc(0, 0, CONFIG.plane.hitRadiusPixels * 0.8, 0, Math.PI * 2)
-    ctx.stroke()
-  } else if (stuck && Math.sin(shiftTime * 8) > 0) {
-    // blocked-runway flash: the cascade must be legible
-    ctx.strokeStyle = COLORS.planeCritical
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.arc(0, 0, CONFIG.plane.hitRadiusPixels * 0.8, 0, Math.PI * 2)
+    ctx.ellipse(bodyPos.x, bodyPos.y, CONFIG.plane.hitRadiusPixels * 0.8, CONFIG.plane.hitRadiusPixels * 0.5, 0, 0, Math.PI * 2)
     ctx.stroke()
   }
 
-  ctx.restore()
-
   const scale = (CONFIG.plane.width / PLANE_BASELINE_WIDTH) * CONFIG.plane.sizes[plane.size].visualScale
-  const airborne =
-    plane.isAirborneControllable ||
-    plane.state === 'landing' ||
-    (plane.state === 'departing' && plane.wheelsUp)
+  const bankSquish = 1 - Math.abs(bank) * 0.3
 
-  // drop shadow: offset grows with altitude — the cheap depth cue
-  const shadowDx = airborne ? 5 : 2
-  const shadowDy = airborne ? 8 : 3
+  // drop shadow on the ground, under wherever the plane currently is
   ctx.save()
-  ctx.translate(plane.x + shadowDx, plane.y + shadowDy)
-  ctx.rotate(plane.heading)
+  ctx.translate(shadowPos.x, shadowPos.y)
+  ctx.rotate(heading)
   ctx.scale(scale, scale)
   ctx.fillStyle = COLORS.shadow
   ctx.fill(getPlanePath())
   ctx.restore()
 
   ctx.save()
-  ctx.translate(plane.x, plane.y)
-  ctx.rotate(plane.heading)
-  ctx.scale(scale, scale)
+  ctx.translate(bodyPos.x, bodyPos.y)
+  ctx.rotate(heading)
+  ctx.scale(scale, scale * bankSquish)
   if (plane.state === 'at_gate') {
     // refuelling / boarding passengers: ghosted out until turnaround completes
     ctx.globalAlpha = 0.45
@@ -372,10 +522,7 @@ function drawPlane(ctx: CanvasRenderingContext2D, plane: Plane, selected: boolea
     ctx.shadowBlur = 10 * scale
   } else if (plane.state === 'boarding' && plane.boardingStart !== null) {
     // ready to depart: pulsing glow, green while fresh, yellow as the window drains
-    const remaining = Math.max(
-      0,
-      1 - (shiftTime - plane.boardingStart) / CONFIG.gate.departWindowSeconds
-    )
+    const remaining = Math.max(0, 1 - (shiftTime - plane.boardingStart) / CONFIG.gate.departWindowSeconds)
     ctx.shadowColor =
       plane.gateDelaySeconds > 0 ? COLORS.planeCritical : remaining > 0.5 ? COLORS.fuelGreen : COLORS.fuelBar
     ctx.shadowBlur = (10 + 5 * Math.sin(shiftTime * 6)) * scale
@@ -384,36 +531,39 @@ function drawPlane(ctx: CanvasRenderingContext2D, plane: Plane, selected: boolea
   ctx.fill(getPlanePath())
   ctx.restore()
 
+  const { height: h } = CONFIG.plane
+
   // callsign + always-on fuel countdown bar (airborne)
   if (plane.isAirborneControllable) {
     ctx.fillStyle = COLORS.hud
     ctx.font = `${CONFIG.ui.hudFontSize - 2}px monospace`
     ctx.textAlign = 'center'
-    ctx.fillText(plane.callsign, plane.x, plane.y - h - 10)
+    ctx.fillText(plane.callsign, bodyPos.x, bodyPos.y - h - 10)
 
-    drawBar(ctx, plane, plane.fuel / 100, fuelColor(plane.fuel / 100))
+    drawBar(ctx, bodyPos, plane.fuel / 100, fuelColor(plane.fuel / 100))
     return
   }
 
   // boarding: the 3-minute departure countdown
   if (plane.state === 'boarding' && plane.boardingStart !== null) {
-    const remaining = Math.max(
-      0,
-      1 - (shiftTime - plane.boardingStart) / CONFIG.gate.departWindowSeconds
-    )
+    const remaining = Math.max(0, 1 - (shiftTime - plane.boardingStart) / CONFIG.gate.departWindowSeconds)
     const overdue = plane.gateDelaySeconds > 0
     const color = overdue
       ? Math.sin(shiftTime * 8) > 0 ? COLORS.planeCritical : COLORS.barBg // overdue: flashing red
       : fuelColor(remaining)
-    drawBar(ctx, plane, overdue ? 1 : remaining, color)
+    drawBar(ctx, bodyPos, overdue ? 1 : remaining, color)
     return
   }
 
   // patience bar on other waiting ground planes (stuck on runway / hold-short)
   const waitingOnGround = stuck || (plane.state === 'taxiing_out' && plane.atHoldShort)
   if (waitingOnGround && plane.patience <= CONFIG.ui.patienceWarningThreshold * 2) {
-    drawBar(ctx, plane, plane.patience / 100,
-      plane.patience <= CONFIG.ui.patienceWarningThreshold ? COLORS.planeCritical : COLORS.patienceBar)
+    drawBar(
+      ctx,
+      bodyPos,
+      plane.patience / 100,
+      plane.patience <= CONFIG.ui.patienceWarningThreshold ? COLORS.planeCritical : COLORS.patienceBar
+    )
   }
 }
 
@@ -430,13 +580,14 @@ function fuelColor(fraction: number): string {
   return COLORS.planeCritical
 }
 
-function drawBar(ctx: CanvasRenderingContext2D, plane: Plane, fraction: number, color: string): void {
+/** Billboarded (never rotated/skewed) status bar above a plane's projected screen position */
+function drawBar(ctx: CanvasRenderingContext2D, screenPos: ScreenPoint, fraction: number, color: string): void {
   const barW = CONFIG.plane.width + 8
-  const y = plane.y - CONFIG.plane.height - 7
+  const y = screenPos.y - CONFIG.plane.height - 7
   ctx.fillStyle = COLORS.barBg
-  ctx.fillRect(plane.x - barW / 2, y, barW, 4)
+  ctx.fillRect(screenPos.x - barW / 2, y, barW, 4)
   ctx.fillStyle = color
-  ctx.fillRect(plane.x - barW / 2, y, barW * Math.max(0, Math.min(1, fraction)), 4)
+  ctx.fillRect(screenPos.x - barW / 2, y, barW * Math.max(0, Math.min(1, fraction)), 4)
 }
 
 function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {

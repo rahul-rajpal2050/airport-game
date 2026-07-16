@@ -24,8 +24,16 @@ later adaptation, not the default.
    palette with dawn/dusk transitions and runway edge lights after dark
 4. ✅ Satisfaction scoring — headline score is passenger satisfaction % (0.4×A:00 +
    0.6×D:00, minus 5% per complaint = rage/diversion); points demoted to "ops score"
-5. Daily challenge + leaderboard (friends competition; architecture ready via seeded runs)
-6. 2.5D isometric visual overhaul (altitude shadows, banking planes, depth-sorted terminal)
+5. ✅ Daily challenge + leaderboard (Supabase; comeback loop — personal bests, daily
+   streak, live "beat NN%" target; COPY RESULT share card; golden flight + on-time combo)
+6. ✅ 2.5D visual pass — real plane altitude (shadow separation, smooth glide/climb),
+   depth-sorted draw order, extruded runways/terminal/gates, banking on turns. Built as
+   a **tilted orthographic** projection (Y-squash + height, no diagonal shear) rather
+   than a diamond dimetric: the world layout is mirror-symmetric about a vertical axis
+   (V-terminal, runway row), and a true diagonal-shear isometric only preserves that
+   symmetry if the map itself is laid out around the shear's diagonals — confirmed live
+   (the diamond version rendered the V's two arms lopsided). A full diamond-isometric
+   redesign of the map layout remains a possible future pass.
 
 ---
 
@@ -179,10 +187,10 @@ This is a deliberate simplification from Flight Control. The complexity lives in
 
 ## Art Direction
 
-Placeholder phase is rectangles and circles. The target (post-mechanics overhaul):
-- **2.5D isometric**: angled perspective, altitude shadows under airborne planes,
-  planes banking into turns, depth-sorted terminal buildings, textured terrain
-- Landscape composition for laptop screens (Mini Metro / Monument Valley polish tier)
+- **2.5D tilted view** (live): real plane altitude with ground shadows, banking on
+  turns, depth-sorted extruded runways/terminal/gates. Landscape composition for
+  laptop screens (Mini Metro / Monument Valley polish tier is the aspiration —
+  current pass is functional depth, not yet that level of texture/lighting polish)
 - Color language: green = clear, yellow = caution, red = critical, blue = VIP
 - Planes are distinct silhouettes (regional jet, widebody, cargo)
 - Runways feel like runways — painted markings, edge lighting at night shifts

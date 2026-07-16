@@ -79,6 +79,25 @@ export const CONFIG = {
     targetFps: 60,
   },
 
+  // Tilted orthographic projection: screenX=wx*scaleX+originX,
+  // screenY=wy*scaleY-height+originY — NO diagonal shear. A true diamond
+  // dimetric was tried and rejected live: our world layout (V-terminal,
+  // runways) is mirror-symmetric about a vertical world axis, and a diagonal
+  // shear formula only preserves that symmetry if the map itself is designed
+  // around the projection's diagonals (it isn't — that's a bigger redesign).
+  // Pure Y-squash + height preserves every existing symmetry exactly while
+  // still giving real height, shadows, extruded buildings, and banking.
+  iso: {
+    scaleX: 1,
+    scaleY: 0.65,
+    originX: 0,
+    originY: 140,
+    planeMaxHeightPx: 46,     // how high airborne planes rise above the ground
+    groundExtrusionPx: 10,    // runway/apron side-face thickness
+    buildingExtrusionPx: 16,  // terminal side-face thickness (a taller "building")
+    gateExtrusionPx: 6,
+  },
+
   shift: {
     durationSeconds: 300,
     largeProbability: 0.35,    // share of spawns that are wide-body (seeded roll)
